@@ -32,7 +32,7 @@ codesign --force --deep -s - ~/Applications/"Herdr Browser.app"   # local signat
 ```
 
 On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses the address bar,
-`Cmd+1-9` switches tabs, and the app can be picked as the default browser in System Settings → Desktop & Dock.
+`Cmd+1-9` switches tabs, `Cmd+F` finds in the page, `Cmd+Shift+J` opens DevTools, and the app can be picked as the default browser in System Settings → Desktop & Dock.
 
 ## Run / build
 

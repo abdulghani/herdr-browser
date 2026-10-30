@@ -9,6 +9,7 @@ const SIDEBAR_WIDTH = 220;
 const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
 const CHROME_HEIGHT = 76; // tab strip + toolbar, must match styles.css
 const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match styles.css
+const FIND_HEIGHT = 36; // per-tab find bar under the notice bar, must match styles.css
 const HOME_URL = 'https://www.google.com';
 const BLANK_URL = 'about:blank'; // new tabs start here, with the address bar focused
 const BLANK_BG = '#0b0d10'; // --bg in styles.css, so a blank tab isn't a white flash
@@ -105,6 +106,7 @@ function broadcast() {
     ...state,
     prefixArmed,
     awake: [...views.keys()],
+    find: finds.get(tab.id) || null,
     nav: {
       canGoBack: wc ? wc.navigationHistory.canGoBack() : false,
       canGoForward: wc ? wc.navigationHistory.canGoForward() : false,
@@ -120,7 +122,8 @@ function broadcast() {
 function contentBounds() {
   const [w, h] = win.getContentSize();
   const left = state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
-  const top = CHROME_HEIGHT + (activeTab().notice ? NOTICE_HEIGHT : 0);
+  const tab = activeTab();
+  const top = CHROME_HEIGHT + (tab.notice ? NOTICE_HEIGHT : 0) + (finds.has(tab.id) ? FIND_HEIGHT : 0);
   return { x: left, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) };
 }
 
@@ -152,6 +155,12 @@ function createView(tab) {
     setNotice(tab.id, null);
   });
   wc.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && update({ url }));
+  wc.on('found-in-page', (_e, result) => {
+    const find = finds.get(tab.id);
+    if (!find || !result.finalUpdate) return;
+    Object.assign(find, { active: result.activeMatchOrdinal, total: result.matches });
+    broadcast();
+  });
   wc.on('did-start-loading', () => broadcast());
   wc.on('did-stop-loading', () => broadcast());
   wc.on('before-input-event', (event, input) => handleKey(event, input));
@@ -195,6 +204,7 @@ function destroyView(tabId) {
   views.delete(tabId);
   hiddenSince.delete(tabId);
   mediaTabs.delete(tabId);
+  finds.delete(tabId);
 }
 
 // ---------- tab sleeping ----------
@@ -377,6 +387,51 @@ function showContextMenu(wc, params, tabId) {
   Menu.buildFromTemplate(items).popup({ window: win });
 }
 
+// ---------- find in page ----------
+
+const finds = new Map(); // tabId -> { text, active, total } while its find bar is open
+
+function openFind() {
+  const tab = activeTab();
+  if (!finds.has(tab.id)) {
+    finds.set(tab.id, { text: '', active: 0, total: 0 });
+    layoutView();
+    broadcast();
+  }
+  win.webContents.focus();
+  win.webContents.send('focus-find');
+}
+
+function find(text, { forward = true, findNext = false } = {}) {
+  const tab = activeTab();
+  const entry = finds.get(tab.id);
+  const wc = views.get(tab.id)?.webContents;
+  if (!entry || !wc) return;
+  entry.text = text;
+  if (text) {
+    wc.findInPage(text, { forward, findNext });
+  } else {
+    wc.stopFindInPage('clearSelection');
+    Object.assign(entry, { active: 0, total: 0 });
+    broadcast();
+  }
+}
+
+function findAgain(forward) {
+  const text = finds.get(activeTab().id)?.text;
+  if (text) find(text, { forward, findNext: true });
+  else openFind();
+}
+
+function closeFind() {
+  const tab = activeTab();
+  if (!finds.delete(tab.id)) return;
+  views.get(tab.id)?.webContents.stopFindInPage('keepSelection');
+  layoutView();
+  broadcast();
+  activeWc()?.focus();
+}
+
 // ---------- notices ----------
 
 function setNotice(tabId, notice) {
@@ -454,6 +509,12 @@ const DIRECT_ACTIONS = {
   'alt+shift+down': () => moveWorkspace(1),
   'ctrl+t': () => openTab(),
   'cmd+t': () => openTab(),
+  'ctrl+f': () => openFind(),
+  'cmd+f': () => openFind(),
+  'cmd+g': () => findAgain(true),
+  'cmd+shift+g': () => findAgain(false),
+  f3: () => findAgain(true),
+  'shift+f3': () => findAgain(false),
   'ctrl+w': () => closeTab(),
   'ctrl+shift+t': () => newWorkspaceAction(),
   'ctrl+tab': () => cycleTab(1),
@@ -469,6 +530,7 @@ const DIRECT_ACTIONS = {
   'ctrl+b': () => toggleSidebar(),
   f12: () => activeWc()?.toggleDevTools(),
   'ctrl+shift+i': () => activeWc()?.toggleDevTools(),
+  'cmd+shift+j': () => activeWc()?.toggleDevTools(),
   'ctrl+=': () => zoom(0.5),
   'ctrl+shift+=': () => zoom(0.5),
   'ctrl+-': () => zoom(-0.5),
@@ -488,8 +550,8 @@ function chordOf(input) {
   const mods = [];
   if (input.control) mods.push('ctrl');
   if (input.alt) mods.push('alt');
-  if (input.shift) mods.push('shift');
   if (input.meta) mods.push('cmd');
+  if (input.shift) mods.push('shift');
   return [...mods, key].join('+');
 }
 
@@ -540,6 +602,12 @@ function handleKey(event, input) {
     return selectWorkspace(Number(ctrlDigit[1]) - 1);
   }
 
+  // Escape closes the find bar, wherever the focus is.
+  if (chord === 'escape' && finds.has(activeTab().id)) {
+    event.preventDefault();
+    return closeFind();
+  }
+
   const action = DIRECT_ACTIONS[chord];
   if (action) {
     event.preventDefault();
@@ -550,6 +618,9 @@ function handleKey(event, input) {
 // ---------- IPC from the chrome UI ----------
 
 const COMMANDS = {
+  find: (text) => find(text),
+  findNext: (forward) => findAgain(forward),
+  closeFind: () => closeFind(),
   navigate: (text) => {
     const tab = activeTab();
     tab.url = normalizeUrl(text);
