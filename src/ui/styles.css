@@ -12,6 +12,7 @@
   --tabstrip-h: 36px; /* tabstrip + toolbar = CHROME_HEIGHT in main.js */
   --toolbar-h: 40px;
   --notice-h: 36px; /* NOTICE_HEIGHT in main.js */
+  --find-h: 36px; /* FIND_HEIGHT in main.js */
   font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
 }
@@ -322,3 +323,32 @@ body.platform-darwin.collapsed #tabstrip { padding-left: 28px; }
 }
 #notice-open:hover { background: var(--accent); color: var(--accent-fg); filter: brightness(1.1); }
 #notice-dismiss { height: 24px; font-size: 14px; }
+
+/* ---------- per-tab find bar ---------- */
+
+#find {
+  height: var(--find-h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+#find[hidden] { display: none; }
+#find-input {
+  width: 260px;
+  height: 26px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  outline: none;
+  user-select: text;
+}
+#find-input:focus { border-color: var(--accent); }
+#find-count { min-width: 48px; color: var(--muted); font-size: 11px; }
+#find-count.none { color: #f85149; }
+#find button { height: 24px; font-size: 14px; }

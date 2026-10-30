@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('herdr', {
   cmd: (name, arg) => ipcRenderer.send('cmd', name, arg),
   ready: () => ipcRenderer.send('ready'),
   on: (channel, fn) => {
-    if (!['state', 'rename', 'focus-address', 'toggle-help'].includes(channel)) return;
+    if (!['state', 'rename', 'focus-address', 'toggle-help', 'focus-find'].includes(channel)) return;
     ipcRenderer.on(channel, (_e, payload) => fn(payload));
   },
 });

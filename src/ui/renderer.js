@@ -113,11 +113,24 @@ function renderToolbar() {
   $('reload').title = state.nav.loading ? 'Stop' : 'Reload (Ctrl+R)';
   $('prefix').hidden = !state.prefixArmed;
   renderNotice(tab.notice);
+  renderFind(state.find, tab.id);
 
   const address = $('address');
   // Don't clobber what the user is typing, unless they switched tabs.
   if (document.activeElement !== address || tab.id !== lastActiveTabId) address.value = tab.url === 'about:blank' ? '' : tab.url;
   lastActiveTabId = tab.id;
+}
+
+let findTabId = null;
+function renderFind(find, tabId) {
+  $('find').hidden = !find;
+  if (!find) return;
+  const input = $('find-input');
+  // Don't clobber what the user is typing, unless they switched tabs.
+  if (document.activeElement !== input || tabId !== findTabId) input.value = find.text;
+  findTabId = tabId;
+  $('find-count').textContent = find.text ? `${find.active}/${find.total}` : '';
+  $('find-count').classList.toggle('none', !!find.text && !find.total);
 }
 
 function renderNotice(notice) {
@@ -227,6 +240,19 @@ $('address').onkeydown = (e) => {
     cmd('focusContent');
   }
 };
+
+$('find-input').oninput = (e) => cmd('find', e.target.value);
+$('find-input').onkeydown = (e) => {
+  if (e.key === 'Enter') cmd('findNext', !e.shiftKey);
+  else if (e.key === 'Escape') cmd('closeFind');
+};
+$('find-prev').onclick = () => cmd('findNext', false);
+$('find-next').onclick = () => cmd('findNext', true);
+$('find-close').onclick = () => cmd('closeFind');
+window.herdr.on('focus-find', () => {
+  $('find-input').focus();
+  $('find-input').select();
+});
 
 window.herdr.on('state', (s) => {
   state = s;
