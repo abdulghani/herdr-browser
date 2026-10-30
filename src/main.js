@@ -11,6 +11,9 @@ const CHROME_HEIGHT = 76; // tab strip + toolbar, must match styles.css
 const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match styles.css
 const HOME_URL = 'https://www.google.com';
 const SEARCH_URL = 'https://www.google.com/search?q=';
+// Background tabs not looked at for this long are unloaded to free memory (like Chrome's
+// Memory Saver) and reload, with their back/forward history, when selected again.
+const SLEEP_AFTER_MS = 10 * 60 * 1000;
 
 app.setName('Herdr Browser');
 // A separate profile (and its own single-instance lock), e.g. for development.
@@ -99,6 +102,7 @@ function broadcast() {
   win.webContents.send('state', {
     ...state,
     prefixArmed,
+    awake: [...views.keys()],
     nav: {
       canGoBack: wc ? wc.navigationHistory.canGoBack() : false,
       canGoForward: wc ? wc.navigationHistory.canGoForward() : false,
@@ -137,6 +141,7 @@ function createView(tab) {
   wc.on('page-title-updated', (_e, title) => update({ title }));
   wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons[0] || null }));
   wc.on('did-navigate', (_e, url) => {
+    mediaTabs.delete(tab.id);
     update({ url });
     setNotice(tab.id, null);
   });
@@ -152,7 +157,9 @@ function createView(tab) {
   });
   wc.on('context-menu', (_e, params) => showContextMenu(wc, params, tab.id));
 
-  wc.loadURL(tab.url).catch(() => {});
+  const history = sleptHistory.get(tab.id);
+  sleptHistory.delete(tab.id);
+  (history ? wc.navigationHistory.restore(history) : wc.loadURL(tab.url)).catch(() => {});
   return view;
 }
 
@@ -180,6 +187,47 @@ function destroyView(tabId) {
   }
   view.webContents.close();
   views.delete(tabId);
+  hiddenSince.delete(tabId);
+  mediaTabs.delete(tabId);
+}
+
+// ---------- tab sleeping ----------
+
+const hiddenSince = new Map(); // tabId -> when its loaded view was last hidden
+const sleptHistory = new Map(); // tabId -> back/forward history to restore on wake
+const mediaTabs = new Set(); // tabs that asked for camera/mic on their current page
+
+function tabIdOf(wc) {
+  for (const [tabId, view] of views) if (view.webContents === wc) return tabId;
+  return null;
+}
+
+// Tabs in a call, playing sound, or still loading stay awake.
+function canSleep(tabId) {
+  const wc = views.get(tabId).webContents;
+  return !mediaTabs.has(tabId) && !wc.isCurrentlyAudible() && !wc.isLoading() && !wc.isCrashed();
+}
+
+function sleepTab(tabId) {
+  const nav = views.get(tabId).webContents.navigationHistory;
+  sleptHistory.set(tabId, { entries: nav.getAllEntries(), index: nav.getActiveIndex() });
+  destroyView(tabId);
+}
+
+function sleepIdleTabs() {
+  const now = Date.now();
+  let slept = false;
+  for (const tabId of [...views.keys()]) {
+    if (tabId === shownTabId) {
+      hiddenSince.delete(tabId);
+    } else if (!hiddenSince.has(tabId)) {
+      hiddenSince.set(tabId, now);
+    } else if (now - hiddenSince.get(tabId) >= SLEEP_AFTER_MS && canSleep(tabId)) {
+      sleepTab(tabId);
+      slept = true;
+    }
+  }
+  if (slept) broadcast();
 }
 
 // ---------- actions ----------
@@ -207,6 +255,7 @@ function closeTab(tabId = activeTab().id) {
   if (!found) return;
   const { ws, idx } = found;
   destroyView(tabId);
+  sleptHistory.delete(tabId);
   ws.tabs.splice(idx, 1);
   if (!ws.tabs.length) {
     // Closing the last tab closes the workspace, like herdr.
@@ -260,7 +309,10 @@ function newWorkspaceAction() {
 function closeWorkspace(wsId = activeWs().id) {
   const idx = state.workspaces.findIndex((w) => w.id === wsId);
   if (idx === -1) return;
-  for (const t of state.workspaces[idx].tabs) destroyView(t.id);
+  for (const t of state.workspaces[idx].tabs) {
+    destroyView(t.id);
+    sleptHistory.delete(t.id);
+  }
   state.workspaces.splice(idx, 1);
   if (!state.workspaces.length) state.workspaces.push(newWorkspace('main'));
   if (state.activeWs >= idx) state.activeWs = Math.max(0, state.activeWs - 1);
@@ -328,22 +380,43 @@ function setNotice(tabId, notice) {
   broadcast();
 }
 
-// Passkeys need real Chrome (Google Password Manager, phone QR codes), so hand the page over.
-const EXTERNAL_BROWSERS = [
-  { name: 'Chrome', bin: 'google-chrome-stable' },
-  { name: 'Chrome', bin: 'google-chrome' },
-  { name: 'Chromium', bin: 'chromium' },
-  { name: 'Chromium', bin: 'chromium-browser' },
-];
+// Passkeys need a real browser (Google Password Manager, iCloud Keychain, phone QR codes), so hand the page over.
+const EXTERNAL_BROWSERS = {
+  linux: [
+    { name: 'Chrome', bin: 'google-chrome-stable' },
+    { name: 'Chrome', bin: 'google-chrome' },
+    { name: 'Chromium', bin: 'chromium' },
+    { name: 'Chromium', bin: 'chromium-browser' },
+  ],
+  // Safari ships with macOS, so there is always a fallback.
+  darwin: [
+    { name: 'Chrome', app: 'Google Chrome' },
+    { name: 'Brave', app: 'Brave Browser' },
+    { name: 'Edge', app: 'Microsoft Edge' },
+    { name: 'Chromium', app: 'Chromium' },
+    { name: 'Safari', app: 'Safari' },
+  ],
+};
 let externalBrowserCache;
 
 function externalBrowser() {
   if (externalBrowserCache === undefined) {
-    const dirs = (process.env.PATH || '').split(path.delimiter);
+    const candidates = EXTERNAL_BROWSERS[process.platform] || [];
+    const dirs =
+      process.platform === 'darwin'
+        ? ['/Applications', path.join(app.getPath('home'), 'Applications'), '/System/Volumes/Preboot/Cryptexes/App/System/Applications']
+        : (process.env.PATH || '').split(path.delimiter);
     externalBrowserCache =
-      EXTERNAL_BROWSERS.find(({ bin }) => dirs.some((dir) => fs.existsSync(path.join(dir, bin)))) || null;
+      candidates.find(({ bin, app: name }) =>
+        dirs.some((dir) => fs.existsSync(path.join(dir, bin || `${name}.app`))),
+      ) || null;
   }
   return externalBrowserCache;
+}
+
+function openInBrowser(browser, url) {
+  const [cmd, args] = browser.app ? ['open', ['-a', browser.app, url]] : [browser.bin, [url]];
+  spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
 }
 
 // ---------- keybindings (mirrors ~/.config/herdr/config.toml) ----------
@@ -373,11 +446,13 @@ const DIRECT_ACTIONS = {
   'alt+shift+up': () => moveWorkspace(-1),
   'alt+shift+down': () => moveWorkspace(1),
   'ctrl+t': () => openTab(),
+  'cmd+t': () => openTab(),
   'ctrl+w': () => closeTab(),
   'ctrl+shift+t': () => newWorkspaceAction(),
   'ctrl+tab': () => cycleTab(1),
   'ctrl+shift+tab': () => cycleTab(-1),
   'ctrl+l': () => focusAddressBar(),
+  'cmd+l': () => focusAddressBar(),
   'alt+d': () => focusAddressBar(),
   'ctrl+r': () => activeWc()?.reload(),
   f5: () => activeWc()?.reload(),
@@ -407,6 +482,7 @@ function chordOf(input) {
   if (input.control) mods.push('ctrl');
   if (input.alt) mods.push('alt');
   if (input.shift) mods.push('shift');
+  if (input.meta) mods.push('cmd');
   return [...mods, key].join('+');
 }
 
@@ -443,6 +519,13 @@ function handleKey(event, input) {
   if (altDigit) {
     event.preventDefault();
     return selectTab(Number(altDigit[1]) - 1);
+  }
+  // Like other Mac browsers: Cmd+1-8 jumps to that tab, Cmd+9 to the last one.
+  const cmdDigit = chord.match(/^cmd\+([1-9])$/);
+  if (cmdDigit) {
+    event.preventDefault();
+    const n = Number(cmdDigit[1]);
+    return selectTab(n === 9 ? activeWs().tabs.length - 1 : n - 1);
   }
   const ctrlDigit = chord.match(/^ctrl\+([1-9])$/);
   if (ctrlDigit) {
@@ -527,7 +610,7 @@ const COMMANDS = {
     const tab = activeTab();
     const browser = externalBrowser();
     if (!browser) return;
-    spawn(browser.bin, [tab.url], { detached: true, stdio: 'ignore' }).unref();
+    openInBrowser(browser, tab.url);
     setNotice(tab.id, null);
   },
   focusContent: () => (shownTabId === activeTab().id ? activeWc()?.focus() : showActiveView()),
@@ -548,6 +631,9 @@ function createWindow() {
     height: 900,
     backgroundColor: '#0b0d10',
     autoHideMenuBar: true,
+    // On macOS the tab strip is the title bar: hide the native one and set the
+    // window buttons into the top-left corner (centered in the 36px tab strip).
+    ...(process.platform === 'darwin' && { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 11 } }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
   });
   Menu.setApplicationMenu(null);
@@ -556,7 +642,8 @@ function createWindow() {
   win.on('resize', layoutView);
   win.on('close', saveNow);
   win.webContents.once('did-finish-load', () => {
-    const urls = urlsFromArgv(process.argv);
+    windowReady = true;
+    const urls = [...urlsFromArgv(process.argv), ...pendingUrls.splice(0)];
     if (urls.length) urls.forEach((url) => openTab(url));
     else showActiveView();
   });
@@ -580,12 +667,38 @@ app.on('second-instance', (_e, argv) => {
   urlsFromArgv(argv).forEach((url) => openTab(url));
 });
 
+// macOS hands over links (as the default browser) and files through events, not argv.
+// They can arrive before the window is ready, so hold them until then.
+const pendingUrls = [];
+let windowReady = false;
+function openExternalUrl(url) {
+  if (!windowReady) return pendingUrls.push(url);
+  if (win.isMinimized()) win.restore();
+  win.focus();
+  openTab(url);
+}
+app.on('open-url', (e, url) => {
+  e.preventDefault();
+  openExternalUrl(url);
+});
+app.on('open-file', (e, file) => {
+  e.preventDefault();
+  openExternalUrl(`file://${file}`);
+});
+
 app.whenReady().then(() => {
   state = loadState();
   // Grant the everyday permissions; refuse the rest (no prompt UI yet).
   const allowed = new Set(['notifications', 'media', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
-  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(allowed.has(perm)));
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {
+    if (perm === 'media' && details.mediaTypes?.length) {
+      const tabId = tabIdOf(wc);
+      if (tabId) mediaTabs.add(tabId);
+    }
+    cb(allowed.has(perm));
+  });
   createWindow();
+  setInterval(sleepIdleTabs, 30 * 1000);
 });
 
 app.on('window-all-closed', () => app.quit());

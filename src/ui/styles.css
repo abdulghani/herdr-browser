@@ -157,6 +157,19 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .tab .favicon-blank { background: var(--border); }
 .tab .tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab .close { padding: 0 4px; visibility: hidden; }
+/* Not loaded (never opened yet, or put to sleep to save memory): like Chrome, a dimmed
+   favicon inside a dashed circle. The ring is an SVG background (CSS outlines can't set dash
+   length), drawn in the padding; the negative margin keeps the tab layout unchanged.
+   Stroke color is --muted. */
+.tab.asleep img, .tab.asleep .favicon-blank {
+  width: 22px;
+  height: 22px;
+  padding: 4px;
+  margin: -4px;
+  border-radius: 50%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='10.25' fill='none' stroke='%236e7681' stroke-width='1.5' pathLength='48' stroke-dasharray='5 3'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: grayscale(1) opacity(0.6);
+}
 .tab:hover .close, .tab.active .close { visibility: visible; }
 .tab.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
 .tab.dragging, .ws.dragging { opacity: 0.4; }
@@ -273,6 +286,19 @@ body.collapsed .ws-add span {
   font-size: 16px;
 }
 body.collapsed .ws-add:hover span { color: var(--fg); border-color: var(--muted); }
+
+/* ---------- macOS: tab strip doubles as the title bar ---------- */
+
+/* Empty space in the top bars drags the window; anything clickable opts out. */
+body.platform-darwin #sidebar header,
+body.platform-darwin #tabstrip { -webkit-app-region: drag; }
+body.platform-darwin #sidebar header button,
+body.platform-darwin .tab,
+body.platform-darwin #new-tab { -webkit-app-region: no-drag; }
+/* Room for the window buttons (close/minimize/zoom) in the top-left corner. */
+body.platform-darwin #sidebar header { padding-left: 80px; }
+body.platform-darwin.collapsed #sidebar header { padding: var(--tabstrip-h) 0 0; }
+body.platform-darwin.collapsed #tabstrip { padding-left: 28px; }
 
 /* ---------- per-tab notice bar ---------- */
 

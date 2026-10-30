@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const cmd = window.herdr.cmd;
+document.body.classList.add(`platform-${window.herdr.platform}`);
 
 let state = null;
 let renaming = null; // { kind, id } while an inline rename input is open
@@ -84,7 +85,7 @@ function renderTabs() {
       const icon = tab.favicon
         ? el('img', { src: tab.favicon, onerror: (e) => e.target.replaceWith(el('span', { className: 'favicon-blank' })) })
         : el('span', { className: 'favicon-blank' });
-      const item = el('li', { className: `tab${i === ws.activeTab ? ' active' : ''}`, draggable: true, title: `${tabLabel(tab)}\n${tab.url}` }, [
+      const item = el('li', { className: `tab${i === ws.activeTab ? ' active' : ''}${state.awake.includes(tab.id) ? '' : ' asleep'}`, draggable: true, title: `${tabLabel(tab)}\n${tab.url}` }, [
         el('span', { className: 'tab-num', textContent: i + 1 }),
         icon,
         el('span', { className: 'tab-title', textContent: tabLabel(tab) }),
@@ -122,10 +123,10 @@ function renderToolbar() {
 function renderNotice(notice) {
   $('notice').hidden = !notice;
   if (!notice) return;
-  // Only kind so far: a site asked for a passkey, which Electron can't do on Linux.
+  // Only kind so far: a site asked for a passkey, which Electron can't do.
   $('notice-text').textContent = "This site wants a passkey, which doesn't work here yet.";
   $('notice-text').title =
-    'Electron, which Herdr Browser runs on, has no passkey support on Linux. Use another sign-in option, or open the page in a browser that supports passkeys.';
+    'Electron, which Herdr Browser runs on, has no passkey support. Use another sign-in option, or open the page in a browser that supports passkeys.';
   $('notice-open').hidden = !notice.browser;
   $('notice-open').textContent = `Open in ${notice.browser}`;
 }
@@ -237,6 +238,9 @@ window.herdr.on('state', (s) => {
   }
 });
 window.herdr.on('rename', ({ kind, id }) => requestAnimationFrame(() => requestRename(kind, id)));
-window.herdr.on('focus-address', () => $('address').focus());
+window.herdr.on('focus-address', () => {
+  $('address').focus();
+  $('address').select();
+});
 window.herdr.on('toggle-help', () => ($('help').hidden = !$('help').hidden));
 window.herdr.ready();
