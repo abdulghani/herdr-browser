@@ -85,7 +85,7 @@ function renderTabs() {
       const icon = tab.favicon
         ? el('img', { src: tab.favicon, onerror: (e) => e.target.replaceWith(el('span', { className: 'favicon-blank' })) })
         : el('span', { className: 'favicon-blank' });
-      const item = el('li', { className: `tab${i === ws.activeTab ? ' active' : ''}`, draggable: true, title: `${tabLabel(tab)}\n${tab.url}` }, [
+      const item = el('li', { className: `tab${i === ws.activeTab ? ' active' : ''}${state.awake.includes(tab.id) ? '' : ' asleep'}`, draggable: true, title: `${tabLabel(tab)}\n${tab.url}` }, [
         el('span', { className: 'tab-num', textContent: i + 1 }),
         icon,
         el('span', { className: 'tab-title', textContent: tabLabel(tab) }),

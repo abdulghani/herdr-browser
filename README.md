@@ -7,6 +7,8 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 - Drag tabs to reorder, or drop them onto another workspace
 - Double-click a workspace or tab to rename it
 - Session (workspaces, tabs, names) is restored on launch
+- Tabs left unviewed for 10 minutes sleep to free memory (dimmed icon in a dashed ring) and
+  reload, with their history, when selected; tabs in a call or playing sound stay awake
 
 ## Install
 
@@ -29,8 +31,8 @@ cp -R dist/mac-*/herdr-browser.app ~/Applications/"Herdr Browser.app"
 codesign --force --deep -s - ~/Applications/"Herdr Browser.app"   # local signature so macOS will open it
 ```
 
-On macOS the tab strip is the title bar, `Cmd+L` focuses the address bar, `Cmd+1-9` switches
-tabs, and the app can be picked as the default browser in System Settings → Desktop & Dock.
+On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses the address bar,
+`Cmd+1-9` switches tabs, and the app can be picked as the default browser in System Settings → Desktop & Dock.
 
 ## Run / build
 

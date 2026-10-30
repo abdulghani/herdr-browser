@@ -11,6 +11,9 @@ const CHROME_HEIGHT = 76; // tab strip + toolbar, must match styles.css
 const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match styles.css
 const HOME_URL = 'https://www.google.com';
 const SEARCH_URL = 'https://www.google.com/search?q=';
+// Background tabs not looked at for this long are unloaded to free memory (like Chrome's
+// Memory Saver) and reload, with their back/forward history, when selected again.
+const SLEEP_AFTER_MS = 10 * 60 * 1000;
 
 app.setName('Herdr Browser');
 // A separate profile (and its own single-instance lock), e.g. for development.
@@ -99,6 +102,7 @@ function broadcast() {
   win.webContents.send('state', {
     ...state,
     prefixArmed,
+    awake: [...views.keys()],
     nav: {
       canGoBack: wc ? wc.navigationHistory.canGoBack() : false,
       canGoForward: wc ? wc.navigationHistory.canGoForward() : false,
@@ -137,6 +141,7 @@ function createView(tab) {
   wc.on('page-title-updated', (_e, title) => update({ title }));
   wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons[0] || null }));
   wc.on('did-navigate', (_e, url) => {
+    mediaTabs.delete(tab.id);
     update({ url });
     setNotice(tab.id, null);
   });
@@ -152,7 +157,9 @@ function createView(tab) {
   });
   wc.on('context-menu', (_e, params) => showContextMenu(wc, params, tab.id));
 
-  wc.loadURL(tab.url).catch(() => {});
+  const history = sleptHistory.get(tab.id);
+  sleptHistory.delete(tab.id);
+  (history ? wc.navigationHistory.restore(history) : wc.loadURL(tab.url)).catch(() => {});
   return view;
 }
 
@@ -180,6 +187,47 @@ function destroyView(tabId) {
   }
   view.webContents.close();
   views.delete(tabId);
+  hiddenSince.delete(tabId);
+  mediaTabs.delete(tabId);
+}
+
+// ---------- tab sleeping ----------
+
+const hiddenSince = new Map(); // tabId -> when its loaded view was last hidden
+const sleptHistory = new Map(); // tabId -> back/forward history to restore on wake
+const mediaTabs = new Set(); // tabs that asked for camera/mic on their current page
+
+function tabIdOf(wc) {
+  for (const [tabId, view] of views) if (view.webContents === wc) return tabId;
+  return null;
+}
+
+// Tabs in a call, playing sound, or still loading stay awake.
+function canSleep(tabId) {
+  const wc = views.get(tabId).webContents;
+  return !mediaTabs.has(tabId) && !wc.isCurrentlyAudible() && !wc.isLoading() && !wc.isCrashed();
+}
+
+function sleepTab(tabId) {
+  const nav = views.get(tabId).webContents.navigationHistory;
+  sleptHistory.set(tabId, { entries: nav.getAllEntries(), index: nav.getActiveIndex() });
+  destroyView(tabId);
+}
+
+function sleepIdleTabs() {
+  const now = Date.now();
+  let slept = false;
+  for (const tabId of [...views.keys()]) {
+    if (tabId === shownTabId) {
+      hiddenSince.delete(tabId);
+    } else if (!hiddenSince.has(tabId)) {
+      hiddenSince.set(tabId, now);
+    } else if (now - hiddenSince.get(tabId) >= SLEEP_AFTER_MS && canSleep(tabId)) {
+      sleepTab(tabId);
+      slept = true;
+    }
+  }
+  if (slept) broadcast();
 }
 
 // ---------- actions ----------
@@ -207,6 +255,7 @@ function closeTab(tabId = activeTab().id) {
   if (!found) return;
   const { ws, idx } = found;
   destroyView(tabId);
+  sleptHistory.delete(tabId);
   ws.tabs.splice(idx, 1);
   if (!ws.tabs.length) {
     // Closing the last tab closes the workspace, like herdr.
@@ -260,7 +309,10 @@ function newWorkspaceAction() {
 function closeWorkspace(wsId = activeWs().id) {
   const idx = state.workspaces.findIndex((w) => w.id === wsId);
   if (idx === -1) return;
-  for (const t of state.workspaces[idx].tabs) destroyView(t.id);
+  for (const t of state.workspaces[idx].tabs) {
+    destroyView(t.id);
+    sleptHistory.delete(t.id);
+  }
   state.workspaces.splice(idx, 1);
   if (!state.workspaces.length) state.workspaces.push(newWorkspace('main'));
   if (state.activeWs >= idx) state.activeWs = Math.max(0, state.activeWs - 1);
@@ -394,6 +446,7 @@ const DIRECT_ACTIONS = {
   'alt+shift+up': () => moveWorkspace(-1),
   'alt+shift+down': () => moveWorkspace(1),
   'ctrl+t': () => openTab(),
+  'cmd+t': () => openTab(),
   'ctrl+w': () => closeTab(),
   'ctrl+shift+t': () => newWorkspaceAction(),
   'ctrl+tab': () => cycleTab(1),
@@ -637,8 +690,15 @@ app.whenReady().then(() => {
   state = loadState();
   // Grant the everyday permissions; refuse the rest (no prompt UI yet).
   const allowed = new Set(['notifications', 'media', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
-  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(allowed.has(perm)));
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {
+    if (perm === 'media' && details.mediaTypes?.length) {
+      const tabId = tabIdOf(wc);
+      if (tabId) mediaTabs.add(tabId);
+    }
+    cb(allowed.has(perm));
+  });
   createWindow();
+  setInterval(sleepIdleTabs, 30 * 1000);
 });
 
 app.on('window-all-closed', () => app.quit());
