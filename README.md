@@ -8,12 +8,25 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 - Double-click a workspace or tab to rename it
 - Session (workspaces, tabs, names) is restored on launch
 
+## Install
+
+Download the AppImage from [Releases](https://github.com/abdulghani/herdr-browser/releases), then:
+
+```sh
+scripts/install-linux.sh ~/Downloads/HerdrBrowser-0.1.0-x86_64.AppImage
+```
+
+This unpacks it to `~/.local/share/herdr-browser` (no FUSE needed), adds an app-launcher
+entry, and puts a `herdr-browser` command in `~/.local/bin`.
+Remove it with `scripts/install-linux.sh --uninstall`.
+
 ## Run / build
 
 ```sh
 npm install
 npm start               # run from source
 npm run dist            # build dist/HerdrBrowser-<version>-x86_64.AppImage
+scripts/install-linux.sh   # install the newest build from dist/
 ```
 
 The AppImage needs FUSE 2 (`sudo pacman -S fuse2` on Arch), or run it with
