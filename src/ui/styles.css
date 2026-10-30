@@ -11,6 +11,7 @@
   --sidebar-collapsed-w: 52px; /* SIDEBAR_COLLAPSED_WIDTH in main.js */
   --tabstrip-h: 36px; /* tabstrip + toolbar = CHROME_HEIGHT in main.js */
   --toolbar-h: 40px;
+  --notice-h: 36px; /* NOTICE_HEIGHT in main.js */
   font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
 }
@@ -272,3 +273,26 @@ body.collapsed .ws-add span {
   font-size: 16px;
 }
 body.collapsed .ws-add:hover span { color: var(--fg); border-color: var(--muted); }
+
+/* ---------- per-tab notice bar ---------- */
+
+#notice {
+  height: var(--notice-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 14px;
+  background: #1c2433;
+  border-bottom: 1px solid var(--border);
+}
+#notice[hidden] { display: none; }
+#notice-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#notice-open {
+  height: 24px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: bold;
+}
+#notice-open:hover { background: var(--accent); color: var(--accent-fg); filter: brightness(1.1); }
+#notice-dismiss { height: 24px; font-size: 14px; }

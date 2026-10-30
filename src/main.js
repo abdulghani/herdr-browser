@@ -1,16 +1,20 @@
 // Herdr Browser: herdr's layout applied to a Chromium browser.
 // herdr workspace -> sidebar entry (vertical), herdr tab -> tab strip entry (horizontal).
-const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu, clipboard } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 const SIDEBAR_WIDTH = 220;
 const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
 const CHROME_HEIGHT = 76; // tab strip + toolbar, must match styles.css
+const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match styles.css
 const HOME_URL = 'https://www.google.com';
 const SEARCH_URL = 'https://www.google.com/search?q=';
 
 app.setName('Herdr Browser');
+// A separate profile (and its own single-instance lock), e.g. for development.
+if (process.env.HERDR_BROWSER_PROFILE) app.setPath('userData', path.resolve(process.env.HERDR_BROWSER_PROFILE));
 // Drop the "Electron/x" and app tokens so sites treat us as plain Chrome.
 app.userAgentFallback = app.userAgentFallback
   .replace(/\sElectron\/\S+/, '')
@@ -110,12 +114,15 @@ function broadcast() {
 function contentBounds() {
   const [w, h] = win.getContentSize();
   const left = state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
-  return { x: left, y: CHROME_HEIGHT, width: Math.max(0, w - left), height: Math.max(0, h - CHROME_HEIGHT) };
+  const top = CHROME_HEIGHT + (activeTab().notice ? NOTICE_HEIGHT : 0);
+  return { x: left, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) };
 }
+
+const layoutView = () => views.get(shownTabId)?.setBounds(contentBounds());
 
 function createView(tab) {
   const view = new WebContentsView({
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'page-preload.js') },
   });
   const wc = view.webContents;
   views.set(tab.id, view);
@@ -129,7 +136,10 @@ function createView(tab) {
 
   wc.on('page-title-updated', (_e, title) => update({ title }));
   wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons[0] || null }));
-  wc.on('did-navigate', (_e, url) => update({ url }));
+  wc.on('did-navigate', (_e, url) => {
+    update({ url });
+    setNotice(tab.id, null);
+  });
   wc.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && update({ url }));
   wc.on('did-start-loading', () => broadcast());
   wc.on('did-stop-loading', () => broadcast());
@@ -278,8 +288,7 @@ function moveWorkspace(delta) {
 
 function toggleSidebar() {
   state.sidebarCollapsed = !state.sidebarCollapsed;
-  const view = views.get(shownTabId);
-  if (view) view.setBounds(contentBounds());
+  layoutView();
   broadcast();
 }
 
@@ -294,7 +303,7 @@ function showContextMenu(wc, params, tabId) {
   const items = [];
   if (params.linkURL) {
     items.push({ label: 'Open Link in New Tab', click: () => openTab(params.linkURL, findTab(tabId)?.ws) });
-    items.push({ label: 'Copy Link Address', click: () => require('electron').clipboard.writeText(params.linkURL) });
+    items.push({ label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) });
     items.push({ type: 'separator' });
   }
   if (params.isEditable) items.push({ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { type: 'separator' });
@@ -307,6 +316,34 @@ function showContextMenu(wc, params, tabId) {
     { label: 'Inspect', click: () => wc.inspectElement(params.x, params.y) },
   );
   Menu.buildFromTemplate(items).popup({ window: win });
+}
+
+// ---------- notices ----------
+
+function setNotice(tabId, notice) {
+  const found = findTab(tabId);
+  if (!found || (!found.tab.notice && !notice)) return;
+  found.tab.notice = notice || undefined;
+  if (tabId === shownTabId) layoutView();
+  broadcast();
+}
+
+// Passkeys need real Chrome (Google Password Manager, phone QR codes), so hand the page over.
+const EXTERNAL_BROWSERS = [
+  { name: 'Chrome', bin: 'google-chrome-stable' },
+  { name: 'Chrome', bin: 'google-chrome' },
+  { name: 'Chromium', bin: 'chromium' },
+  { name: 'Chromium', bin: 'chromium-browser' },
+];
+let externalBrowserCache;
+
+function externalBrowser() {
+  if (externalBrowserCache === undefined) {
+    const dirs = (process.env.PATH || '').split(path.delimiter);
+    externalBrowserCache =
+      EXTERNAL_BROWSERS.find(({ bin }) => dirs.some((dir) => fs.existsSync(path.join(dir, bin)))) || null;
+  }
+  return externalBrowserCache;
 }
 
 // ---------- keybindings (mirrors ~/.config/herdr/config.toml) ----------
@@ -485,10 +522,22 @@ const COMMANDS = {
     broadcast();
   },
   toggleSidebar: () => toggleSidebar(),
+  dismissNotice: () => setNotice(activeTab().id, null),
+  openExternally: () => {
+    const tab = activeTab();
+    const browser = externalBrowser();
+    if (!browser) return;
+    spawn(browser.bin, [tab.url], { detached: true, stdio: 'ignore' }).unref();
+    setNotice(tab.id, null);
+  },
   focusContent: () => (shownTabId === activeTab().id ? activeWc()?.focus() : showActiveView()),
 };
 
 ipcMain.on('cmd', (_e, name, arg) => COMMANDS[name]?.(arg));
+ipcMain.on('passkey-request', (e) => {
+  const entry = [...views].find(([, view]) => view.webContents === e.sender);
+  if (entry) setNotice(entry[0], { kind: 'passkey', browser: externalBrowser()?.name ?? null });
+});
 ipcMain.on('ready', () => broadcast());
 
 // ---------- app lifecycle ----------
@@ -504,7 +553,7 @@ function createWindow() {
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
   win.webContents.on('before-input-event', (event, input) => handleKey(event, input));
-  win.on('resize', () => views.get(shownTabId)?.setBounds(contentBounds()));
+  win.on('resize', layoutView);
   win.on('close', saveNow);
   win.webContents.once('did-finish-load', () => {
     const urls = urlsFromArgv(process.argv);

@@ -111,11 +111,23 @@ function renderToolbar() {
   $('reload').textContent = state.nav.loading ? '×' : '↻';
   $('reload').title = state.nav.loading ? 'Stop' : 'Reload (Ctrl+R)';
   $('prefix').hidden = !state.prefixArmed;
+  renderNotice(tab.notice);
 
   const address = $('address');
   // Don't clobber what the user is typing, unless they switched tabs.
   if (document.activeElement !== address || tab.id !== lastActiveTabId) address.value = tab.url;
   lastActiveTabId = tab.id;
+}
+
+function renderNotice(notice) {
+  $('notice').hidden = !notice;
+  if (!notice) return;
+  // Only kind so far: a site asked for a passkey, which Electron can't do on Linux.
+  $('notice-text').textContent = "This site wants a passkey, which doesn't work here yet.";
+  $('notice-text').title =
+    'Electron, which Herdr Browser runs on, has no passkey support on Linux. Use another sign-in option, or open the page in a browser that supports passkeys.';
+  $('notice-open').hidden = !notice.browser;
+  $('notice-open').textContent = `Open in ${notice.browser}`;
 }
 
 // ---------- inline rename ----------
@@ -197,6 +209,8 @@ $('forward').onclick = () => cmd('forward');
 $('reload').onclick = () => cmd(state?.nav.loading ? 'stop' : 'reload');
 $('sidebar-toggle').onclick = () => cmd('toggleSidebar');
 $('collapse').onclick = () => cmd('toggleSidebar');
+$('notice-open').onclick = () => cmd('openExternally');
+$('notice-dismiss').onclick = () => cmd('dismissNotice');
 $('help-toggle').onclick = () => ($('help').hidden = !$('help').hidden);
 $('tabstrip').ondblclick = (e) => e.target.id === 'tabs' || e.target.id === 'tabstrip' ? cmd('newTab') : null;
 

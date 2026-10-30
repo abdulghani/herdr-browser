@@ -13,7 +13,7 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 Download the AppImage from [Releases](https://github.com/abdulghani/herdr-browser/releases), then:
 
 ```sh
-scripts/install-linux.sh ~/Downloads/HerdrBrowser-0.1.0-x86_64.AppImage
+scripts/install-linux.sh ~/Downloads/HerdrBrowser-<version>-x86_64.AppImage
 ```
 
 This unpacks it to `~/.local/share/herdr-browser` (no FUSE needed), adds an app-launcher
@@ -31,6 +31,16 @@ scripts/install-linux.sh   # install the newest build from dist/
 
 The AppImage needs FUSE 2 (`sudo pacman -S fuse2` on Arch), or run it with
 `APPIMAGE_EXTRACT_AND_RUN=1`.
+
+Set `HERDR_BROWSER_PROFILE=/some/dir` to run with a separate profile, e.g. alongside your
+everyday instance while developing.
+
+## Known limitations
+
+- **Passkeys don't work.** Electron has no WebAuthn support on Linux
+  ([electron/electron#24573](https://github.com/electron/electron/issues/24573)). Sites are told
+  passkeys are unavailable so they offer other sign-in methods, and if one still asks, a bar offers
+  to open the page in Chrome/Chromium.
 
 ## Keys
 
