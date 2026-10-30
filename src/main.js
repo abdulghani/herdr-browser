@@ -10,6 +10,8 @@ const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
 const CHROME_HEIGHT = 76; // tab strip + toolbar, must match styles.css
 const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match styles.css
 const HOME_URL = 'https://www.google.com';
+const BLANK_URL = 'about:blank'; // new tabs start here, with the address bar focused
+const BLANK_BG = '#0b0d10'; // --bg in styles.css, so a blank tab isn't a white flash
 const SEARCH_URL = 'https://www.google.com/search?q=';
 // Background tabs not looked at for this long are unloaded to free memory (like Chrome's
 // Memory Saver) and reload, with their back/forward history, when selected again.
@@ -37,7 +39,7 @@ let saveTimer = null;
 
 // ---------- state ----------
 
-const newTab = (url = HOME_URL) => ({ id: `t${nextId++}`, url, title: 'New Tab', favicon: null });
+const newTab = (url = BLANK_URL) => ({ id: `t${nextId++}`, url, title: 'New Tab', favicon: null });
 const newWorkspace = (name) => {
   const ws = { id: `w${nextId++}`, name: name || `workspace ${state ? state.workspaces.length + 1 : 1}`, tabs: [newTab()], activeTab: 0 };
   return ws;
@@ -138,7 +140,11 @@ function createView(tab) {
     broadcast();
   };
 
-  wc.on('page-title-updated', (_e, title) => update({ title }));
+  wc.on('page-title-updated', (_e, title) => update({ title: title === BLANK_URL ? 'New Tab' : title }));
+  // Pages with no background of their own paint over the view's color, so only darken blank tabs.
+  const paintBackground = (url) => view.setBackgroundColor(url === BLANK_URL ? BLANK_BG : '#ffffff');
+  paintBackground(tab.url);
+  wc.on('did-start-navigation', (details) => details.isMainFrame && paintBackground(details.url));
   wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons[0] || null }));
   wc.on('did-navigate', (_e, url) => {
     mediaTabs.delete(tab.id);
@@ -241,12 +247,13 @@ function normalizeUrl(input) {
   return SEARCH_URL + encodeURIComponent(text);
 }
 
-function openTab(url = HOME_URL, ws = activeWs(), index = ws.tabs.length) {
+function openTab(url = BLANK_URL, ws = activeWs(), index = ws.tabs.length) {
   const tab = newTab(url);
   ws.tabs.splice(index, 0, tab);
   state.activeWs = state.workspaces.indexOf(ws);
   ws.activeTab = index;
   showActiveView();
+  if (url === BLANK_URL) focusAddressBar();
   return tab;
 }
 

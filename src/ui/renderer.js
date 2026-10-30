@@ -116,7 +116,7 @@ function renderToolbar() {
 
   const address = $('address');
   // Don't clobber what the user is typing, unless they switched tabs.
-  if (document.activeElement !== address || tab.id !== lastActiveTabId) address.value = tab.url;
+  if (document.activeElement !== address || tab.id !== lastActiveTabId) address.value = tab.url === 'about:blank' ? '' : tab.url;
   lastActiveTabId = tab.id;
 }
 
