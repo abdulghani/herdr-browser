@@ -1,0 +1,43 @@
+{
+  "name": "herdr-browser",
+  "productName": "Herdr Browser",
+  "version": "0.1.0",
+  "description": "Chromium browser with herdr-style layout: vertical workspaces, horizontal tabs inside each",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
+  },
+  "desktopName": "herdr-browser.desktop",
+  "build": {
+    "appId": "dev.herdr.browser",
+    "executableName": "herdr-browser",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Network;WebBrowser",
+      "artifactName": "HerdrBrowser-${version}-${arch}.AppImage",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "herdr-browser",
+          "MimeType": "x-scheme-handler/http;x-scheme-handler/https;text/html;"
+        }
+      },
+      "syncDesktopName": true
+    }
+  }
+}
