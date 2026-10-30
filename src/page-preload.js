@@ -1,4 +1,4 @@
-// Runs in every web page. Electron has no WebAuthn UI on Linux, so passkey requests
+// Runs in every web page. Electron has no passkey (WebAuthn) UI, so passkey requests
 // hang forever (electron/electron#24573). Report passkeys as unavailable so sites
 // offer other sign-in methods, and fail any request that still comes in right away
 // instead of hanging, letting the browser offer to open the page in Chrome.

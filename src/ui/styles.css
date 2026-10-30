@@ -274,6 +274,19 @@ body.collapsed .ws-add span {
 }
 body.collapsed .ws-add:hover span { color: var(--fg); border-color: var(--muted); }
 
+/* ---------- macOS: tab strip doubles as the title bar ---------- */
+
+/* Empty space in the top bars drags the window; anything clickable opts out. */
+body.platform-darwin #sidebar header,
+body.platform-darwin #tabstrip { -webkit-app-region: drag; }
+body.platform-darwin #sidebar header button,
+body.platform-darwin .tab,
+body.platform-darwin #new-tab { -webkit-app-region: no-drag; }
+/* Room for the window buttons (close/minimize/zoom) in the top-left corner. */
+body.platform-darwin #sidebar header { padding-left: 80px; }
+body.platform-darwin.collapsed #sidebar header { padding: var(--tabstrip-h) 0 0; }
+body.platform-darwin.collapsed #tabstrip { padding-left: 28px; }
+
 /* ---------- per-tab notice bar ---------- */
 
 #notice {

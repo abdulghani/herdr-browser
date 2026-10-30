@@ -328,22 +328,43 @@ function setNotice(tabId, notice) {
   broadcast();
 }
 
-// Passkeys need real Chrome (Google Password Manager, phone QR codes), so hand the page over.
-const EXTERNAL_BROWSERS = [
-  { name: 'Chrome', bin: 'google-chrome-stable' },
-  { name: 'Chrome', bin: 'google-chrome' },
-  { name: 'Chromium', bin: 'chromium' },
-  { name: 'Chromium', bin: 'chromium-browser' },
-];
+// Passkeys need a real browser (Google Password Manager, iCloud Keychain, phone QR codes), so hand the page over.
+const EXTERNAL_BROWSERS = {
+  linux: [
+    { name: 'Chrome', bin: 'google-chrome-stable' },
+    { name: 'Chrome', bin: 'google-chrome' },
+    { name: 'Chromium', bin: 'chromium' },
+    { name: 'Chromium', bin: 'chromium-browser' },
+  ],
+  // Safari ships with macOS, so there is always a fallback.
+  darwin: [
+    { name: 'Chrome', app: 'Google Chrome' },
+    { name: 'Brave', app: 'Brave Browser' },
+    { name: 'Edge', app: 'Microsoft Edge' },
+    { name: 'Chromium', app: 'Chromium' },
+    { name: 'Safari', app: 'Safari' },
+  ],
+};
 let externalBrowserCache;
 
 function externalBrowser() {
   if (externalBrowserCache === undefined) {
-    const dirs = (process.env.PATH || '').split(path.delimiter);
+    const candidates = EXTERNAL_BROWSERS[process.platform] || [];
+    const dirs =
+      process.platform === 'darwin'
+        ? ['/Applications', path.join(app.getPath('home'), 'Applications'), '/System/Volumes/Preboot/Cryptexes/App/System/Applications']
+        : (process.env.PATH || '').split(path.delimiter);
     externalBrowserCache =
-      EXTERNAL_BROWSERS.find(({ bin }) => dirs.some((dir) => fs.existsSync(path.join(dir, bin)))) || null;
+      candidates.find(({ bin, app: name }) =>
+        dirs.some((dir) => fs.existsSync(path.join(dir, bin || `${name}.app`))),
+      ) || null;
   }
   return externalBrowserCache;
+}
+
+function openInBrowser(browser, url) {
+  const [cmd, args] = browser.app ? ['open', ['-a', browser.app, url]] : [browser.bin, [url]];
+  spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
 }
 
 // ---------- keybindings (mirrors ~/.config/herdr/config.toml) ----------
@@ -378,6 +399,7 @@ const DIRECT_ACTIONS = {
   'ctrl+tab': () => cycleTab(1),
   'ctrl+shift+tab': () => cycleTab(-1),
   'ctrl+l': () => focusAddressBar(),
+  'cmd+l': () => focusAddressBar(),
   'alt+d': () => focusAddressBar(),
   'ctrl+r': () => activeWc()?.reload(),
   f5: () => activeWc()?.reload(),
@@ -407,6 +429,7 @@ function chordOf(input) {
   if (input.control) mods.push('ctrl');
   if (input.alt) mods.push('alt');
   if (input.shift) mods.push('shift');
+  if (input.meta) mods.push('cmd');
   return [...mods, key].join('+');
 }
 
@@ -443,6 +466,13 @@ function handleKey(event, input) {
   if (altDigit) {
     event.preventDefault();
     return selectTab(Number(altDigit[1]) - 1);
+  }
+  // Like other Mac browsers: Cmd+1-8 jumps to that tab, Cmd+9 to the last one.
+  const cmdDigit = chord.match(/^cmd\+([1-9])$/);
+  if (cmdDigit) {
+    event.preventDefault();
+    const n = Number(cmdDigit[1]);
+    return selectTab(n === 9 ? activeWs().tabs.length - 1 : n - 1);
   }
   const ctrlDigit = chord.match(/^ctrl\+([1-9])$/);
   if (ctrlDigit) {
@@ -527,7 +557,7 @@ const COMMANDS = {
     const tab = activeTab();
     const browser = externalBrowser();
     if (!browser) return;
-    spawn(browser.bin, [tab.url], { detached: true, stdio: 'ignore' }).unref();
+    openInBrowser(browser, tab.url);
     setNotice(tab.id, null);
   },
   focusContent: () => (shownTabId === activeTab().id ? activeWc()?.focus() : showActiveView()),
@@ -548,6 +578,9 @@ function createWindow() {
     height: 900,
     backgroundColor: '#0b0d10',
     autoHideMenuBar: true,
+    // On macOS the tab strip is the title bar: hide the native one and set the
+    // window buttons into the top-left corner (centered in the 36px tab strip).
+    ...(process.platform === 'darwin' && { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 11 } }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
   });
   Menu.setApplicationMenu(null);
@@ -556,7 +589,8 @@ function createWindow() {
   win.on('resize', layoutView);
   win.on('close', saveNow);
   win.webContents.once('did-finish-load', () => {
-    const urls = urlsFromArgv(process.argv);
+    windowReady = true;
+    const urls = [...urlsFromArgv(process.argv), ...pendingUrls.splice(0)];
     if (urls.length) urls.forEach((url) => openTab(url));
     else showActiveView();
   });
@@ -578,6 +612,25 @@ app.on('second-instance', (_e, argv) => {
   if (win.isMinimized()) win.restore();
   win.focus();
   urlsFromArgv(argv).forEach((url) => openTab(url));
+});
+
+// macOS hands over links (as the default browser) and files through events, not argv.
+// They can arrive before the window is ready, so hold them until then.
+const pendingUrls = [];
+let windowReady = false;
+function openExternalUrl(url) {
+  if (!windowReady) return pendingUrls.push(url);
+  if (win.isMinimized()) win.restore();
+  win.focus();
+  openTab(url);
+}
+app.on('open-url', (e, url) => {
+  e.preventDefault();
+  openExternalUrl(url);
+});
+app.on('open-file', (e, file) => {
+  e.preventDefault();
+  openExternalUrl(`file://${file}`);
 });
 
 app.whenReady().then(() => {

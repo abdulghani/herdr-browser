@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('herdr', {
+  platform: process.platform,
   cmd: (name, arg) => ipcRenderer.send('cmd', name, arg),
   ready: () => ipcRenderer.send('ready'),
   on: (channel, fn) => {

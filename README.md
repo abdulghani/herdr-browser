@@ -20,6 +20,18 @@ This unpacks it to `~/.local/share/herdr-browser` (no FUSE needed), adds an app-
 entry, and puts a `herdr-browser` command in `~/.local/bin`.
 Remove it with `scripts/install-linux.sh --uninstall`.
 
+### macOS
+
+```sh
+npm install
+npm run dist:mac     # builds dist/mac-<arch>/herdr-browser.app (unsigned)
+cp -R dist/mac-*/herdr-browser.app ~/Applications/"Herdr Browser.app"
+codesign --force --deep -s - ~/Applications/"Herdr Browser.app"   # local signature so macOS will open it
+```
+
+On macOS the tab strip is the title bar, `Cmd+L` focuses the address bar, `Cmd+1-9` switches
+tabs, and the app can be picked as the default browser in System Settings → Desktop & Dock.
+
 ## Run / build
 
 ```sh
@@ -37,10 +49,10 @@ everyday instance while developing.
 
 ## Known limitations
 
-- **Passkeys don't work.** Electron has no WebAuthn support on Linux
+- **Passkeys don't work.** Electron has no WebAuthn support on Linux or macOS
   ([electron/electron#24573](https://github.com/electron/electron/issues/24573)). Sites are told
   passkeys are unavailable so they offer other sign-in methods, and if one still asks, a bar offers
-  to open the page in Chrome/Chromium.
+  to open the page in Chrome/Chromium (on macOS: Chrome, Brave, Edge or Safari).
 
 ## Keys
 
