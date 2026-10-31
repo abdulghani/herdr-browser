@@ -118,7 +118,7 @@ function renderToolbar() {
   const address = $('address');
   // Don't clobber what the user is typing, unless they switched tabs.
   if (document.activeElement !== address || tab.id !== lastActiveTabId) address.value = tab.url === 'about:blank' ? '' : tab.url;
-  if (tab.id !== lastActiveTabId || tab.url !== 'about:blank') hideSuggestions();
+  if (tab.id !== lastActiveTabId) hideSuggestions();
   lastActiveTabId = tab.id;
 }
 
@@ -236,39 +236,43 @@ $('address-form').onsubmit = (e) => {
 };
 $('address').onfocus = (e) => {
   e.target.select();
-  updateSuggestions();
+  updateSuggestions({ onFocus: true });
 };
-$('address').onblur = () => hideSuggestions();
+// Wait a moment: a press on the overlay moves focus out of here just before its pick arrives.
+$('address').onblur = () => setTimeout(() => document.activeElement !== $('address') && hideSuggestions(), 150);
 $('address').oninput = () => updateSuggestions();
 $('address').onkeydown = (e) => {
-  if (!$('suggestions').hidden && e.key === 'Enter') {
+  if (suggestionsOpen && e.key === 'Enter') {
     e.preventDefault();
     pickSuggestion(suggestionRows[selectedRow]);
-  } else if (!$('suggestions').hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+  } else if (suggestionsOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
     e.preventDefault();
     const n = suggestionRows.length;
-    selectedRow = (selectedRow + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
-    renderSuggestions();
+    selectRow((selectedRow + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);
   } else if (e.key === 'Escape') {
-    if (!$('suggestions').hidden) return hideSuggestions();
+    if (suggestionsOpen) return hideSuggestions();
     renderToolbar();
     cmd('focusContent');
   }
 };
 
-// ---------- address bar suggestions (blank tabs only: their page is hidden to make room) ----------
+// ---------- address bar suggestions ----------
+// The list is drawn by an overlay view on top of the page (ui/suggest.html); this side owns the
+// rows and the selection, and tells main where to put the overlay.
 
 let suggestionRows = []; // [{ kind: 'typed' | 'tab' | 'history', ... }]
 let selectedRow = 0;
 let suggestSeq = 0;
+let suggestionsOpen = false;
 
 const activeTabState = () => state && state.workspaces[state.activeWs].tabs[state.workspaces[state.activeWs].activeTab];
-const looksLikeUrl = (text) =>
-  /^[a-z][a-z0-9+.-]*:/i.test(text) || /^localhost(:\d+)?(\/|$)/.test(text) || (!/\s/.test(text) && /\.[a-z]{2,}(:\d+)?(\/|$)/i.test(text));
 
-async function updateSuggestions() {
+// On focus, a blank tab lists recent pages; other tabs wait for typing (so clicking in to copy
+// the address doesn't pop a list over the page).
+async function updateSuggestions({ onFocus = false } = {}) {
   const address = $('address');
-  if (activeTabState()?.url !== 'about:blank' || document.activeElement !== address) return hideSuggestions();
+  if (document.activeElement !== address) return hideSuggestions();
+  if (onFocus && activeTabState()?.url !== 'about:blank') return;
   const query = address.value.trim();
   const seq = ++suggestSeq;
   const matches = await window.herdr.suggest(query);
@@ -276,71 +280,38 @@ async function updateSuggestions() {
   suggestionRows = query ? [{ kind: 'typed', query }, ...matches] : matches;
   selectedRow = 0;
   if (!suggestionRows.length) return hideSuggestions();
-  renderSuggestions();
+  showSuggestions();
+}
+
+function showSuggestions() {
+  const { left, bottom, width } = $('address').getBoundingClientRect();
+  cmd('showSuggestions', { rows: suggestionRows, selected: selectedRow, rect: { x: left, y: bottom + 4, width } });
+  suggestionsOpen = true;
 }
 
 function hideSuggestions() {
   suggestSeq++;
   suggestionRows = [];
-  $('suggestions').hidden = true;
+  if (suggestionsOpen) cmd('hideSuggestions');
+  suggestionsOpen = false;
+}
+
+function selectRow(i) {
+  selectedRow = i;
+  cmd('selectSuggestion', i);
 }
 
 function pickSuggestion(row) {
+  if (!row) return;
   if (row.kind === 'tab') cmd('switchToTab', row.tabId);
   else cmd('navigate', row.kind === 'typed' ? row.query : row.url);
   hideSuggestions();
   $('address').blur();
 }
 
-// Text with the fuzzy-matched characters in bold.
-function highlighted(text, positions) {
-  const marks = new Set(positions);
-  const out = [];
-  for (let i = 0; i < text.length; ) {
-    const bold = marks.has(i);
-    let j = i;
-    while (j < text.length && marks.has(j) === bold) j++;
-    out.push(bold ? el('b', { textContent: text.slice(i, j) }) : document.createTextNode(text.slice(i, j)));
-    i = j;
-  }
-  return out;
-}
-
-function renderSuggestions() {
-  const list = $('suggestions');
-  list.replaceChildren(
-    ...suggestionRows.map((row, i) => {
-      let icon, main, detail;
-      if (row.kind === 'typed') {
-        const url = looksLikeUrl(row.query);
-        icon = el('span', { className: 'sg-icon', textContent: url ? '↗' : '⌕' });
-        main = [el('span', { className: 'sg-title', textContent: row.query })];
-        detail = url ? 'open' : 'search Google';
-      } else {
-        const blank = () => el('span', { className: 'sg-icon favicon-blank' });
-        icon = row.favicon ? el('img', { className: 'sg-icon', src: row.favicon, onerror: (e) => e.target.replaceWith(blank()) }) : blank();
-        main = [
-          el('span', { className: 'sg-title' }, highlighted(row.title || row.displayUrl, row.title ? row.highlight.title : row.highlight.url)),
-          ...(row.title ? [el('span', { className: 'sg-url' }, highlighted(row.displayUrl, row.highlight.url))] : []),
-        ];
-        detail = row.kind === 'tab' ? 'switch to tab' : '';
-      }
-      const item = el('li', { className: `sg${i === selectedRow ? ' selected' : ''}` }, [
-        icon,
-        ...main,
-        el('span', { className: 'sg-detail', textContent: detail }),
-      ]);
-      item.onmousedown = (e) => e.preventDefault(); // keep focus in the address bar
-      item.onmouseenter = () => {
-        selectedRow = i;
-        renderSuggestions();
-      };
-      item.onclick = () => pickSuggestion(row);
-      return item;
-    }),
-  );
-  list.hidden = false;
-}
+window.herdr.on('suggest-hover', (i) => (selectedRow = i));
+window.herdr.on('suggest-pick', (i) => pickSuggestion(suggestionRows[i]));
+window.addEventListener('resize', () => suggestionsOpen && showSuggestions());
 
 $('find-input').oninput = (e) => cmd('find', e.target.value);
 $('find-input').onkeydown = (e) => {
