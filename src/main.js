@@ -4,6 +4,7 @@ const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu, clipboard }
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { createHistory } = require('./suggest');
 
 const SIDEBAR_WIDTH = 220;
 const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
@@ -37,6 +38,7 @@ let shownTabId = null;
 let prefixArmed = false;
 let prefixTimer = null;
 let saveTimer = null;
+let browsingHistory; // for address bar suggestions
 
 // ---------- state ----------
 
@@ -52,11 +54,18 @@ function loadState() {
     if (!saved.workspaces?.length) throw new Error('empty');
     for (const ws of saved.workspaces) {
       ws.id = `w${nextId++}`;
-      for (const t of ws.tabs) Object.assign(t, { id: `t${nextId++}` });
+      for (const t of ws.tabs) {
+        t.id = `t${nextId++}`;
+        // Back/forward history comes back when the tab is first shown (see createView).
+        if (t.history) sleptHistory.set(t.id, t.history);
+        delete t.history;
+      }
       if (!ws.tabs.length) ws.tabs.push(newTab());
       ws.activeTab = Math.min(Math.max(ws.activeTab || 0, 0), ws.tabs.length - 1);
     }
     saved.activeWs = Math.min(Math.max(saved.activeWs || 0, 0), saved.workspaces.length - 1);
+    if (Array.isArray(saved.closed)) closedStack.push(...saved.closed.slice(-MAX_CLOSED));
+    delete saved.closed;
     return saved;
   } catch {
     return { workspaces: [newWorkspace('main')], activeWs: 0 };
@@ -77,8 +86,9 @@ function saveNow() {
     workspaces: state.workspaces.map((ws) => ({
       name: ws.name,
       activeTab: ws.activeTab,
-      tabs: ws.tabs.map(({ url, title, favicon, customName }) => ({ url, title, favicon, customName })),
+      tabs: ws.tabs.map(tabSnapshot),
     })),
+    closed: closedStack,
   };
   try {
     fs.writeFileSync(sessionFile(), JSON.stringify(data, null, 2));
@@ -124,6 +134,8 @@ function contentBounds() {
   const left = state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
   const tab = activeTab();
   const top = CHROME_HEIGHT + (tab.notice ? NOTICE_HEIGHT : 0) + (finds.has(tab.id) ? FIND_HEIGHT : 0);
+  // A blank tab's page is hidden so the address bar suggestions (part of the window UI) can show there.
+  if (tab.url === BLANK_URL) return { x: left, y: top, width: 0, height: 0 };
   return { x: left, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) };
 }
 
@@ -143,15 +155,23 @@ function createView(tab) {
     broadcast();
   };
 
-  wc.on('page-title-updated', (_e, title) => update({ title: title === BLANK_URL ? 'New Tab' : title }));
+  wc.on('page-title-updated', (_e, title) => {
+    update({ title: title === BLANK_URL ? 'New Tab' : title });
+    browsingHistory.update(wc.getURL(), { title });
+  });
   // Pages with no background of their own paint over the view's color, so only darken blank tabs.
   const paintBackground = (url) => view.setBackgroundColor(url === BLANK_URL ? BLANK_BG : '#ffffff');
   paintBackground(tab.url);
   wc.on('did-start-navigation', (details) => details.isMainFrame && paintBackground(details.url));
-  wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons[0] || null }));
+  wc.on('page-favicon-updated', (_e, favicons) => {
+    update({ favicon: favicons[0] || null });
+    browsingHistory.update(wc.getURL(), { favicon: favicons[0] });
+  });
   wc.on('did-navigate', (_e, url) => {
     mediaTabs.delete(tab.id);
+    browsingHistory.visit(url, wc.getTitle());
     update({ url });
+    if (tab.id === shownTabId) layoutView(); // to or from a blank page
     setNotice(tab.id, null);
   });
   wc.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && update({ url }));
@@ -174,7 +194,7 @@ function createView(tab) {
 
   const history = sleptHistory.get(tab.id);
   sleptHistory.delete(tab.id);
-  (history ? wc.navigationHistory.restore(history) : wc.loadURL(tab.url)).catch(() => {});
+  (history?.entries.length ? wc.navigationHistory.restore(history) : wc.loadURL(tab.url)).catch(() => {});
   return view;
 }
 
@@ -271,14 +291,12 @@ function closeTab(tabId = activeTab().id) {
   const found = findTab(tabId);
   if (!found) return;
   const { ws, idx } = found;
+  // Closing the last tab closes the workspace, like herdr.
+  if (ws.tabs.length === 1) return closeWorkspace(ws.id);
+  rememberClosed({ kind: 'tab', wsId: ws.id, wsName: ws.name, index: idx, tab: tabSnapshot(found.tab) });
   destroyView(tabId);
   sleptHistory.delete(tabId);
   ws.tabs.splice(idx, 1);
-  if (!ws.tabs.length) {
-    // Closing the last tab closes the workspace, like herdr.
-    closeWorkspace(ws.id);
-    return;
-  }
   if (ws.activeTab >= idx) ws.activeTab = Math.max(0, ws.activeTab - 1);
   if (idx === 0) ws.activeTab = 0;
   showActiveView();
@@ -326,13 +344,68 @@ function newWorkspaceAction() {
 function closeWorkspace(wsId = activeWs().id) {
   const idx = state.workspaces.findIndex((w) => w.id === wsId);
   if (idx === -1) return;
-  for (const t of state.workspaces[idx].tabs) {
+  const ws = state.workspaces[idx];
+  rememberClosed({ kind: 'workspace', index: idx, ws: { name: ws.name, activeTab: ws.activeTab, tabs: ws.tabs.map(tabSnapshot) } });
+  for (const t of ws.tabs) {
     destroyView(t.id);
     sleptHistory.delete(t.id);
   }
   state.workspaces.splice(idx, 1);
   if (!state.workspaces.length) state.workspaces.push(newWorkspace('main'));
   if (state.activeWs >= idx) state.activeWs = Math.max(0, state.activeWs - 1);
+  showActiveView();
+}
+
+// ---------- reopen closed tabs/workspaces (Cmd+Shift+T, like Chrome) ----------
+
+const MAX_CLOSED = 25;
+const closedStack = []; // oldest first; saved with the session so it survives a restart
+
+function tabHistory(tabId) {
+  const nav = views.get(tabId)?.webContents.navigationHistory;
+  if (!nav?.length()) return sleptHistory.get(tabId);
+  return { entries: nav.getAllEntries(), index: nav.getActiveIndex() };
+}
+
+const tabSnapshot = (tab) => {
+  const { url, title, favicon, customName } = tab;
+  return { url, title, favicon, customName, history: tabHistory(tab.id) };
+};
+
+// A blank tab that never went anywhere isn't worth reopening.
+const isEmptyTab = (snap) => snap.url === BLANK_URL && !(snap.history?.entries.length > 1);
+
+function rememberClosed(entry) {
+  const tabs = entry.kind === 'tab' ? [entry.tab] : entry.ws.tabs;
+  if (tabs.every(isEmptyTab)) return;
+  closedStack.push(entry);
+  if (closedStack.length > MAX_CLOSED) closedStack.shift();
+}
+
+function tabFromSnapshot({ history, ...fields }) {
+  const tab = { ...newTab(fields.url), ...fields };
+  if (history) sleptHistory.set(tab.id, history);
+  return tab;
+}
+
+function reopenClosed() {
+  const entry = closedStack.pop();
+  if (!entry) return;
+  if (entry.kind === 'tab') {
+    // Back into its workspace if that's still open (ids change across restarts, so fall back to the name).
+    const ws =
+      state.workspaces.find((w) => w.id === entry.wsId) || state.workspaces.find((w) => w.name === entry.wsName) || activeWs();
+    const index = Math.min(entry.index, ws.tabs.length);
+    ws.tabs.splice(index, 0, tabFromSnapshot(entry.tab));
+    state.activeWs = state.workspaces.indexOf(ws);
+    ws.activeTab = index;
+  } else {
+    const ws = { ...newWorkspace(entry.ws.name), tabs: entry.ws.tabs.map(tabFromSnapshot) };
+    ws.activeTab = Math.min(entry.ws.activeTab || 0, ws.tabs.length - 1);
+    const index = Math.min(entry.index, state.workspaces.length);
+    state.workspaces.splice(index, 0, ws);
+    state.activeWs = index;
+  }
   showActiveView();
 }
 
@@ -509,6 +582,7 @@ const DIRECT_ACTIONS = {
   'alt+shift+down': () => moveWorkspace(1),
   'ctrl+t': () => openTab(),
   'cmd+t': () => openTab(),
+  'cmd+shift+t': () => reopenClosed(),
   'ctrl+f': () => openFind(),
   'cmd+f': () => openFind(),
   'cmd+g': () => findAgain(true),
@@ -618,6 +692,13 @@ function handleKey(event, input) {
 // ---------- IPC from the chrome UI ----------
 
 const COMMANDS = {
+  switchToTab: (tabId) => {
+    const found = findTab(tabId);
+    if (!found) return;
+    state.activeWs = state.workspaces.indexOf(found.ws);
+    found.ws.activeTab = found.idx;
+    showActiveView();
+  },
   find: (text) => find(text),
   findNext: (forward) => findAgain(forward),
   closeFind: () => closeFind(),
@@ -625,6 +706,7 @@ const COMMANDS = {
     const tab = activeTab();
     tab.url = normalizeUrl(text);
     (views.get(tab.id) || createView(tab)).webContents.loadURL(tab.url).catch(() => {});
+    layoutView();
     views.get(tab.id).webContents.focus();
     broadcast();
   },
@@ -700,6 +782,15 @@ ipcMain.on('passkey-request', (e) => {
   if (entry) setNotice(entry[0], { kind: 'passkey', browser: externalBrowser()?.name ?? null });
 });
 ipcMain.on('ready', () => broadcast());
+ipcMain.handle('suggest', (_e, query) => {
+  const current = activeTab().id;
+  const openTabs = state.workspaces.flatMap((ws) =>
+    ws.tabs
+      .filter((t) => t.id !== current && t.url !== BLANK_URL)
+      .map((t) => ({ tabId: t.id, url: t.url, title: t.customName || t.title, favicon: t.favicon })),
+  );
+  return browsingHistory.suggest(String(query || ''), openTabs);
+});
 
 // ---------- app lifecycle ----------
 
@@ -718,7 +809,10 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
   win.webContents.on('before-input-event', (event, input) => handleKey(event, input));
   win.on('resize', layoutView);
-  win.on('close', saveNow);
+  win.on('close', () => {
+    saveNow();
+    browsingHistory.saveNow();
+  });
   win.webContents.once('did-finish-load', () => {
     windowReady = true;
     const urls = [...urlsFromArgv(process.argv), ...pendingUrls.splice(0)];
@@ -766,6 +860,7 @@ app.on('open-file', (e, file) => {
 
 app.whenReady().then(() => {
   state = loadState();
+  browsingHistory = createHistory(path.join(app.getPath('userData'), 'history.json'));
   // Grant the everyday permissions; refuse the rest (no prompt UI yet).
   const allowed = new Set(['notifications', 'media', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {

@@ -352,3 +352,39 @@ body.platform-darwin.collapsed #tabstrip { padding-left: 28px; }
 #find-count { min-width: 48px; color: var(--muted); font-size: 11px; }
 #find-count.none { color: #f85149; }
 #find button { height: 24px; font-size: 14px; }
+
+/* ---------- address bar suggestions ---------- */
+
+#address-form { position: relative; }
+#suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+#suggestions[hidden] { display: none; }
+.sg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.sg.selected { background: var(--panel-2); }
+.sg .favicon-blank { background: var(--border); }
+.sg .sg-icon { width: 14px; height: 14px; flex: none; border-radius: 2px; color: var(--muted); text-align: center; line-height: 14px; }
+.sg .sg-title { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.sg .sg-url { overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; color: var(--muted); }
+.sg .sg-url::before { content: "— "; }
+.sg .sg-detail { margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 11px; flex: none; }
+.sg b { color: var(--accent); font-weight: 600; }
