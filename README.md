@@ -24,12 +24,14 @@ Remove it with `scripts/install-linux.sh --uninstall`.
 
 ### macOS
 
-```sh
-npm install
-npm run dist:mac     # builds dist/mac-<arch>/herdr-browser.app (unsigned)
-cp -R dist/mac-*/herdr-browser.app ~/Applications/"Herdr Browser.app"
-codesign --force --deep -s - ~/Applications/"Herdr Browser.app"   # local signature so macOS will open it
-```
+Download the `.dmg` for your Mac from [Releases](https://github.com/abdulghani/herdr-browser/releases)
+(`arm64` for Apple Silicon, `x64` for Intel), open it, and drag Herdr Browser into Applications.
+
+The app isn't signed with an Apple developer account, so the first launch is blocked with
+"Apple could not verify…". Open **System Settings → Privacy & Security** and click **Open Anyway**,
+or run `xattr -dr com.apple.quarantine "/Applications/Herdr Browser.app"`.
+
+To build the dmgs yourself: `npm install && npm run dist:mac` (output in `dist/`).
 
 On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses the address bar,
 `Cmd+1-9` switches tabs, `Cmd+F` finds in the page, `Cmd+Shift+J` opens DevTools, and the app can be picked as the default browser in System Settings → Desktop & Dock.

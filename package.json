@@ -1,13 +1,13 @@
 {
   "name": "herdr-browser",
   "productName": "Herdr Browser",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Chromium browser with herdr-style layout: vertical workspaces, horizontal tabs inside each",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --linux AppImage",
-    "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir"
+    "dist:mac": "electron-builder --mac dmg --arm64 --x64"
   },
   "devDependencies": {
     "electron": "^45.1.0",
@@ -16,7 +16,6 @@
   "desktopName": "herdr-browser.desktop",
   "build": {
     "appId": "dev.herdr.browser",
-    "executableName": "herdr-browser",
     "files": [
       "src/**/*",
       "package.json"
@@ -38,7 +37,8 @@
           "MimeType": "x-scheme-handler/http;x-scheme-handler/https;text/html;"
         }
       },
-      "syncDesktopName": true
+      "syncDesktopName": true,
+      "executableName": "herdr-browser"
     },
     "mac": {
       "icon": "build/icon.png",
@@ -64,7 +64,16 @@
             ]
           }
         ]
-      }
+      },
+      "identity": "-",
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "HerdrBrowser-${version}-${arch}.${ext}",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Herdr Browser ${version}"
     }
   }
 }
