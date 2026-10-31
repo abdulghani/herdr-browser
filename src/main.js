@@ -134,8 +134,6 @@ function contentBounds() {
   const left = state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
   const tab = activeTab();
   const top = CHROME_HEIGHT + (tab.notice ? NOTICE_HEIGHT : 0) + (finds.has(tab.id) ? FIND_HEIGHT : 0);
-  // A blank tab's page is hidden so the address bar suggestions (part of the window UI) can show there.
-  if (tab.url === BLANK_URL) return { x: left, y: top, width: 0, height: 0 };
   return { x: left, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) };
 }
 
@@ -171,7 +169,6 @@ function createView(tab) {
     mediaTabs.delete(tab.id);
     browsingHistory.visit(url, wc.getTitle());
     update({ url });
-    if (tab.id === shownTabId) layoutView(); // to or from a blank page
     setNotice(tab.id, null);
   });
   wc.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && update({ url }));
@@ -505,6 +502,37 @@ function closeFind() {
   activeWc()?.focus();
 }
 
+// ---------- address bar suggestions overlay ----------
+
+const SUGGEST_ROW_HEIGHT = 32; // .sg height in styles.css
+const SUGGEST_PADDING = 10; // #suggestions padding + border, top and bottom
+let suggestView = null;
+
+// The list floats over the page, so it lives in its own transparent view stacked above it.
+function showSuggestions({ rows, selected, rect }) {
+  if (!suggestView) {
+    suggestView = new WebContentsView({
+      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'suggest-preload.js') },
+    });
+    suggestView.setBackgroundColor('#00000000');
+    suggestView.webContents.loadFile(path.join(__dirname, 'ui', 'suggest.html'));
+  }
+  const send = () => suggestView.webContents.send('suggest-rows', { rows, selected });
+  if (suggestView.webContents.isLoading()) suggestView.webContents.once('did-finish-load', send);
+  else send();
+  win.contentView.addChildView(suggestView); // (re-)adding puts it on top of the page view
+  suggestView.setBounds({
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.round(rect.width),
+    height: rows.length * SUGGEST_ROW_HEIGHT + SUGGEST_PADDING,
+  });
+  suggestView.setVisible(true);
+}
+
+ipcMain.on('suggest-hover', (_e, index) => win.webContents.send('suggest-hover', index));
+ipcMain.on('suggest-pick', (_e, index) => win.webContents.send('suggest-pick', index));
+
 // ---------- notices ----------
 
 function setNotice(tabId, notice) {
@@ -692,6 +720,9 @@ function handleKey(event, input) {
 // ---------- IPC from the chrome UI ----------
 
 const COMMANDS = {
+  showSuggestions: (payload) => showSuggestions(payload),
+  hideSuggestions: () => suggestView?.setVisible(false),
+  selectSuggestion: (index) => suggestView?.webContents.send('suggest-select', index),
   switchToTab: (tabId) => {
     const found = findTab(tabId);
     if (!found) return;
@@ -706,7 +737,6 @@ const COMMANDS = {
     const tab = activeTab();
     tab.url = normalizeUrl(text);
     (views.get(tab.id) || createView(tab)).webContents.loadURL(tab.url).catch(() => {});
-    layoutView();
     views.get(tab.id).webContents.focus();
     broadcast();
   },
