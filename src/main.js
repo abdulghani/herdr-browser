@@ -52,11 +52,18 @@ function loadState() {
     if (!saved.workspaces?.length) throw new Error('empty');
     for (const ws of saved.workspaces) {
       ws.id = `w${nextId++}`;
-      for (const t of ws.tabs) Object.assign(t, { id: `t${nextId++}` });
+      for (const t of ws.tabs) {
+        t.id = `t${nextId++}`;
+        // Back/forward history comes back when the tab is first shown (see createView).
+        if (t.history) sleptHistory.set(t.id, t.history);
+        delete t.history;
+      }
       if (!ws.tabs.length) ws.tabs.push(newTab());
       ws.activeTab = Math.min(Math.max(ws.activeTab || 0, 0), ws.tabs.length - 1);
     }
     saved.activeWs = Math.min(Math.max(saved.activeWs || 0, 0), saved.workspaces.length - 1);
+    if (Array.isArray(saved.closed)) closedStack.push(...saved.closed.slice(-MAX_CLOSED));
+    delete saved.closed;
     return saved;
   } catch {
     return { workspaces: [newWorkspace('main')], activeWs: 0 };
@@ -77,8 +84,9 @@ function saveNow() {
     workspaces: state.workspaces.map((ws) => ({
       name: ws.name,
       activeTab: ws.activeTab,
-      tabs: ws.tabs.map(({ url, title, favicon, customName }) => ({ url, title, favicon, customName })),
+      tabs: ws.tabs.map(tabSnapshot),
     })),
+    closed: closedStack,
   };
   try {
     fs.writeFileSync(sessionFile(), JSON.stringify(data, null, 2));
@@ -174,7 +182,7 @@ function createView(tab) {
 
   const history = sleptHistory.get(tab.id);
   sleptHistory.delete(tab.id);
-  (history ? wc.navigationHistory.restore(history) : wc.loadURL(tab.url)).catch(() => {});
+  (history?.entries.length ? wc.navigationHistory.restore(history) : wc.loadURL(tab.url)).catch(() => {});
   return view;
 }
 
@@ -271,14 +279,12 @@ function closeTab(tabId = activeTab().id) {
   const found = findTab(tabId);
   if (!found) return;
   const { ws, idx } = found;
+  // Closing the last tab closes the workspace, like herdr.
+  if (ws.tabs.length === 1) return closeWorkspace(ws.id);
+  rememberClosed({ kind: 'tab', wsId: ws.id, wsName: ws.name, index: idx, tab: tabSnapshot(found.tab) });
   destroyView(tabId);
   sleptHistory.delete(tabId);
   ws.tabs.splice(idx, 1);
-  if (!ws.tabs.length) {
-    // Closing the last tab closes the workspace, like herdr.
-    closeWorkspace(ws.id);
-    return;
-  }
   if (ws.activeTab >= idx) ws.activeTab = Math.max(0, ws.activeTab - 1);
   if (idx === 0) ws.activeTab = 0;
   showActiveView();
@@ -326,13 +332,68 @@ function newWorkspaceAction() {
 function closeWorkspace(wsId = activeWs().id) {
   const idx = state.workspaces.findIndex((w) => w.id === wsId);
   if (idx === -1) return;
-  for (const t of state.workspaces[idx].tabs) {
+  const ws = state.workspaces[idx];
+  rememberClosed({ kind: 'workspace', index: idx, ws: { name: ws.name, activeTab: ws.activeTab, tabs: ws.tabs.map(tabSnapshot) } });
+  for (const t of ws.tabs) {
     destroyView(t.id);
     sleptHistory.delete(t.id);
   }
   state.workspaces.splice(idx, 1);
   if (!state.workspaces.length) state.workspaces.push(newWorkspace('main'));
   if (state.activeWs >= idx) state.activeWs = Math.max(0, state.activeWs - 1);
+  showActiveView();
+}
+
+// ---------- reopen closed tabs/workspaces (Cmd+Shift+T, like Chrome) ----------
+
+const MAX_CLOSED = 25;
+const closedStack = []; // oldest first; saved with the session so it survives a restart
+
+function tabHistory(tabId) {
+  const nav = views.get(tabId)?.webContents.navigationHistory;
+  if (!nav?.length()) return sleptHistory.get(tabId);
+  return { entries: nav.getAllEntries(), index: nav.getActiveIndex() };
+}
+
+const tabSnapshot = (tab) => {
+  const { url, title, favicon, customName } = tab;
+  return { url, title, favicon, customName, history: tabHistory(tab.id) };
+};
+
+// A blank tab that never went anywhere isn't worth reopening.
+const isEmptyTab = (snap) => snap.url === BLANK_URL && !(snap.history?.entries.length > 1);
+
+function rememberClosed(entry) {
+  const tabs = entry.kind === 'tab' ? [entry.tab] : entry.ws.tabs;
+  if (tabs.every(isEmptyTab)) return;
+  closedStack.push(entry);
+  if (closedStack.length > MAX_CLOSED) closedStack.shift();
+}
+
+function tabFromSnapshot({ history, ...fields }) {
+  const tab = { ...newTab(fields.url), ...fields };
+  if (history) sleptHistory.set(tab.id, history);
+  return tab;
+}
+
+function reopenClosed() {
+  const entry = closedStack.pop();
+  if (!entry) return;
+  if (entry.kind === 'tab') {
+    // Back into its workspace if that's still open (ids change across restarts, so fall back to the name).
+    const ws =
+      state.workspaces.find((w) => w.id === entry.wsId) || state.workspaces.find((w) => w.name === entry.wsName) || activeWs();
+    const index = Math.min(entry.index, ws.tabs.length);
+    ws.tabs.splice(index, 0, tabFromSnapshot(entry.tab));
+    state.activeWs = state.workspaces.indexOf(ws);
+    ws.activeTab = index;
+  } else {
+    const ws = { ...newWorkspace(entry.ws.name), tabs: entry.ws.tabs.map(tabFromSnapshot) };
+    ws.activeTab = Math.min(entry.ws.activeTab || 0, ws.tabs.length - 1);
+    const index = Math.min(entry.index, state.workspaces.length);
+    state.workspaces.splice(index, 0, ws);
+    state.activeWs = index;
+  }
   showActiveView();
 }
 
@@ -509,6 +570,7 @@ const DIRECT_ACTIONS = {
   'alt+shift+down': () => moveWorkspace(1),
   'ctrl+t': () => openTab(),
   'cmd+t': () => openTab(),
+  'cmd+shift+t': () => reopenClosed(),
   'ctrl+f': () => openFind(),
   'cmd+f': () => openFind(),
   'cmd+g': () => findAgain(true),
