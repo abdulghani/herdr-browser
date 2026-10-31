@@ -7,6 +7,7 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 - Drag tabs to reorder, or drop them onto another workspace
 - Double-click a workspace or tab to rename it
 - Session (workspaces, tabs, names, back/forward history) is restored on launch
+- On a blank tab, the address bar fuzzy-searches your history and open tabs as you type
 - Closed tabs and workspaces can be reopened (`Cmd+Shift+T` on macOS), even after a restart
 - Tabs left unviewed for 10 minutes sleep to free memory (dimmed icon in a dashed ring) and
   reload, with their history, when selected; tabs in a call or playing sound stay awake

@@ -4,6 +4,7 @@ const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu, clipboard }
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { createHistory } = require('./suggest');
 
 const SIDEBAR_WIDTH = 220;
 const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
@@ -37,6 +38,7 @@ let shownTabId = null;
 let prefixArmed = false;
 let prefixTimer = null;
 let saveTimer = null;
+let browsingHistory; // for address bar suggestions
 
 // ---------- state ----------
 
@@ -132,6 +134,8 @@ function contentBounds() {
   const left = state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
   const tab = activeTab();
   const top = CHROME_HEIGHT + (tab.notice ? NOTICE_HEIGHT : 0) + (finds.has(tab.id) ? FIND_HEIGHT : 0);
+  // A blank tab's page is hidden so the address bar suggestions (part of the window UI) can show there.
+  if (tab.url === BLANK_URL) return { x: left, y: top, width: 0, height: 0 };
   return { x: left, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) };
 }
 
@@ -151,15 +155,23 @@ function createView(tab) {
     broadcast();
   };
 
-  wc.on('page-title-updated', (_e, title) => update({ title: title === BLANK_URL ? 'New Tab' : title }));
+  wc.on('page-title-updated', (_e, title) => {
+    update({ title: title === BLANK_URL ? 'New Tab' : title });
+    browsingHistory.update(wc.getURL(), { title });
+  });
   // Pages with no background of their own paint over the view's color, so only darken blank tabs.
   const paintBackground = (url) => view.setBackgroundColor(url === BLANK_URL ? BLANK_BG : '#ffffff');
   paintBackground(tab.url);
   wc.on('did-start-navigation', (details) => details.isMainFrame && paintBackground(details.url));
-  wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons[0] || null }));
+  wc.on('page-favicon-updated', (_e, favicons) => {
+    update({ favicon: favicons[0] || null });
+    browsingHistory.update(wc.getURL(), { favicon: favicons[0] });
+  });
   wc.on('did-navigate', (_e, url) => {
     mediaTabs.delete(tab.id);
+    browsingHistory.visit(url, wc.getTitle());
     update({ url });
+    if (tab.id === shownTabId) layoutView(); // to or from a blank page
     setNotice(tab.id, null);
   });
   wc.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && update({ url }));
@@ -680,6 +692,13 @@ function handleKey(event, input) {
 // ---------- IPC from the chrome UI ----------
 
 const COMMANDS = {
+  switchToTab: (tabId) => {
+    const found = findTab(tabId);
+    if (!found) return;
+    state.activeWs = state.workspaces.indexOf(found.ws);
+    found.ws.activeTab = found.idx;
+    showActiveView();
+  },
   find: (text) => find(text),
   findNext: (forward) => findAgain(forward),
   closeFind: () => closeFind(),
@@ -687,6 +706,7 @@ const COMMANDS = {
     const tab = activeTab();
     tab.url = normalizeUrl(text);
     (views.get(tab.id) || createView(tab)).webContents.loadURL(tab.url).catch(() => {});
+    layoutView();
     views.get(tab.id).webContents.focus();
     broadcast();
   },
@@ -762,6 +782,15 @@ ipcMain.on('passkey-request', (e) => {
   if (entry) setNotice(entry[0], { kind: 'passkey', browser: externalBrowser()?.name ?? null });
 });
 ipcMain.on('ready', () => broadcast());
+ipcMain.handle('suggest', (_e, query) => {
+  const current = activeTab().id;
+  const openTabs = state.workspaces.flatMap((ws) =>
+    ws.tabs
+      .filter((t) => t.id !== current && t.url !== BLANK_URL)
+      .map((t) => ({ tabId: t.id, url: t.url, title: t.customName || t.title, favicon: t.favicon })),
+  );
+  return browsingHistory.suggest(String(query || ''), openTabs);
+});
 
 // ---------- app lifecycle ----------
 
@@ -780,7 +809,10 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
   win.webContents.on('before-input-event', (event, input) => handleKey(event, input));
   win.on('resize', layoutView);
-  win.on('close', saveNow);
+  win.on('close', () => {
+    saveNow();
+    browsingHistory.saveNow();
+  });
   win.webContents.once('did-finish-load', () => {
     windowReady = true;
     const urls = [...urlsFromArgv(process.argv), ...pendingUrls.splice(0)];
@@ -828,6 +860,7 @@ app.on('open-file', (e, file) => {
 
 app.whenReady().then(() => {
   state = loadState();
+  browsingHistory = createHistory(path.join(app.getPath('userData'), 'history.json'));
   // Grant the everyday permissions; refuse the rest (no prompt UI yet).
   const allowed = new Set(['notifications', 'media', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {
