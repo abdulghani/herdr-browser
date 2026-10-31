@@ -181,6 +181,7 @@ function createView(tab) {
   wc.on('did-start-loading', () => broadcast());
   wc.on('did-stop-loading', () => broadcast());
   wc.on('before-input-event', (event, input) => handleKey(event, input));
+  wc.on('focus', closeSuggestions);
   wc.setWindowOpenHandler(({ url }) => {
     // Popups and target=_blank open as a new tab in the same workspace.
     const found = findTab(tab.id);
@@ -530,6 +531,13 @@ function showSuggestions({ rows, selected, rect }) {
   suggestView.setVisible(true);
 }
 
+// Clicking into the page or leaving the window closes the list, like clicking away in Chrome.
+function closeSuggestions() {
+  if (!suggestView?.getVisible()) return;
+  suggestView.setVisible(false);
+  win.webContents.send('suggest-close');
+}
+
 ipcMain.on('suggest-hover', (_e, index) => win.webContents.send('suggest-hover', index));
 ipcMain.on('suggest-pick', (_e, index) => win.webContents.send('suggest-pick', index));
 
@@ -839,6 +847,7 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
   win.webContents.on('before-input-event', (event, input) => handleKey(event, input));
   win.on('resize', layoutView);
+  win.on('blur', closeSuggestions);
   win.on('close', () => {
     saveNow();
     browsingHistory.saveNow();
