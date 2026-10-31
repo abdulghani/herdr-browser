@@ -238,8 +238,11 @@ $('address').onfocus = (e) => {
   e.target.select();
   updateSuggestions({ onFocus: true });
 };
-// Wait a moment: a press on the overlay moves focus out of here just before its pick arrives.
-$('address').onblur = () => setTimeout(() => document.activeElement !== $('address') && hideSuggestions(), 150);
+// Clicking the page moves focus to another view: the address bar stays this document's active
+// element, but the document itself loses focus. Wait a moment before closing, since a press on the
+// overlay also moves focus out of here just before its pick arrives.
+const addressHasFocus = () => document.hasFocus() && document.activeElement === $('address');
+$('address').onblur = () => setTimeout(() => !addressHasFocus() && hideSuggestions(), 150);
 $('address').oninput = () => updateSuggestions();
 $('address').onkeydown = (e) => {
   if (suggestionsOpen && e.key === 'Enter') {
@@ -271,12 +274,12 @@ const activeTabState = () => state && state.workspaces[state.activeWs].tabs[stat
 // the address doesn't pop a list over the page).
 async function updateSuggestions({ onFocus = false } = {}) {
   const address = $('address');
-  if (document.activeElement !== address) return hideSuggestions();
+  if (!addressHasFocus()) return hideSuggestions();
   if (onFocus && activeTabState()?.url !== 'about:blank') return;
   const query = address.value.trim();
   const seq = ++suggestSeq;
   const matches = await window.herdr.suggest(query);
-  if (seq !== suggestSeq || document.activeElement !== address) return; // a newer keystroke won
+  if (seq !== suggestSeq || !addressHasFocus()) return; // a newer keystroke won, or focus left
   suggestionRows = query ? [{ kind: 'typed', query }, ...matches] : matches;
   selectedRow = 0;
   if (!suggestionRows.length) return hideSuggestions();
@@ -311,6 +314,7 @@ function pickSuggestion(row) {
 
 window.herdr.on('suggest-hover', (i) => (selectedRow = i));
 window.herdr.on('suggest-pick', (i) => pickSuggestion(suggestionRows[i]));
+window.herdr.on('suggest-close', () => hideSuggestions());
 window.addEventListener('resize', () => suggestionsOpen && showSuggestions());
 
 $('find-input').oninput = (e) => cmd('find', e.target.value);
