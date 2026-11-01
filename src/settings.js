@@ -63,7 +63,9 @@ function createSettings(file) {
 function applyDns(app, ses, dns) {
   const provider = DNS_PROVIDERS.find((p) => p.id === dns.provider);
   const url = provider.id === 'custom' ? dns.customUrl : provider.url;
-  app.configureHostResolver(url ? { secureDnsMode: 'secure', secureDnsServers: [url] } : { secureDnsMode: 'automatic', secureDnsServers: [] });
+  app.configureHostResolver(
+    url ? { secureDnsMode: 'secure', secureDnsServers: [url] } : { secureDnsMode: 'automatic', secureDnsServers: [] },
+  );
   // Drop what was looked up or connected through the old server.
   ses.clearHostResolverCache();
   ses.closeAllConnections();

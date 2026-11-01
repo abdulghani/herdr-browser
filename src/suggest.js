@@ -6,7 +6,11 @@ const MAX_RESULTS = 8;
 const DAY = 24 * 60 * 60 * 1000;
 
 // What the address bar shows for a URL: no scheme, "www." or trailing slash.
-const displayUrl = (url) => url.replace(/^[a-z]+:\/\//i, '').replace(/^www\./, '').replace(/\/$/, '');
+const displayUrl = (url) =>
+  url
+    .replace(/^[a-z]+:\/\//i, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '');
 
 // Fuzzy-match one lowercase token against text: every token character must appear in order.
 // Returns { score, positions } or null. Runs of consecutive characters and matches at the start
@@ -130,7 +134,11 @@ function createHistory(file) {
         rank: m.score + item.boost,
       });
     }
-    if (!tokens.length) return results.filter((r) => r.kind === 'history').sort((a, b) => b.rank - a.rank).slice(0, MAX_RESULTS);
+    if (!tokens.length)
+      return results
+        .filter((r) => r.kind === 'history')
+        .sort((a, b) => b.rank - a.rank)
+        .slice(0, MAX_RESULTS);
     return results.sort((a, b) => b.rank - a.rank).slice(0, MAX_RESULTS);
   }
 
