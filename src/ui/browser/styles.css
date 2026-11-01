@@ -7,12 +7,12 @@
   --muted: #6e7681;
   --accent: #58a6ff;
   --accent-fg: #0b0d10;
-  --sidebar-w: 220px; /* SIDEBAR_WIDTH in main.js */
-  --sidebar-collapsed-w: 52px; /* SIDEBAR_COLLAPSED_WIDTH in main.js */
-  --tabstrip-h: 36px; /* tabstrip + toolbar = CHROME_HEIGHT in main.js */
+  --sidebar-w: 220px; /* SIDEBAR_WIDTH in src/services/tab-views/tab-views.js */
+  --sidebar-collapsed-w: 52px; /* SIDEBAR_COLLAPSED_WIDTH in src/services/tab-views/tab-views.js */
+  --tabstrip-h: 36px; /* tabstrip + toolbar = CHROME_HEIGHT in src/services/tab-views/tab-views.js */
   --toolbar-h: 40px;
-  --notice-h: 36px; /* NOTICE_HEIGHT in main.js */
-  --find-h: 36px; /* FIND_HEIGHT in main.js */
+  --notice-h: 36px; /* NOTICE_HEIGHT in src/services/tab-views/tab-views.js */
+  --find-h: 36px; /* FIND_HEIGHT in src/services/tab-views/tab-views.js */
   font-family: 'JetBrainsMono Nerd Font', 'JetBrains Mono', ui-monospace, monospace;
   font-size: 12px;
 }
@@ -544,7 +544,7 @@ body.platform-darwin.collapsed #tabstrip {
 
 /* ---------- address bar suggestions ---------- */
 
-/* Drawn in its own view on top of the page (ui/suggest.html), sized to fit the list. */
+/* Drawn in its own view on top of the page (src/ui/suggestions/index.html), sized to fit the list. */
 body.suggest-overlay {
   background: transparent;
   height: auto;

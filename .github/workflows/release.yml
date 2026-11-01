@@ -1,7 +1,7 @@
 # When a pull request that changes the app's source (src/) or CHANGELOG.md is merged into main,
 # bump the version, add the merged pull requests to CHANGELOG.md, build the Mac and Linux apps
-# and publish them as a GitHub release. Nothing is released unless src/ or CHANGELOG.md changed
-# since the last release, also when run by hand.
+# and publish them as a GitHub release. Nothing is released unless src/ (apart from tests) or
+# CHANGELOG.md changed since the last release, also when run by hand.
 #
 # The version goes up by a patch (0.3.0 -> 0.3.1) unless the pull request has one of these labels:
 #   release:minor   0.3.0 -> 0.4.0
@@ -15,8 +15,11 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+    # Tests and test helpers live in src/ too, but don't ship, so they don't make a release.
     paths:
       - 'src/**'
+      - '!src/**/*.test.js'
+      - '!src/testing/**'
       - 'CHANGELOG.md'
   workflow_dispatch:
     inputs:
@@ -51,11 +54,12 @@ jobs:
         id: diff
         run: |
           previous="$(git describe --tags --abbrev=0 --match 'v*')"
-          if git diff --quiet "$previous" HEAD -- src CHANGELOG.md; then
+          files=(src CHANGELOG.md ':(exclude,glob)src/**/*.test.js' ':(exclude)src/testing')
+          if git diff --quiet "$previous" HEAD -- "${files[@]}"; then
             echo "::notice::Nothing in src/ or CHANGELOG.md changed since $previous, so there's nothing to release."
             echo "release=false" >> "$GITHUB_OUTPUT"
           else
-            git diff --stat "$previous" HEAD -- src CHANGELOG.md
+            git diff --stat "$previous" HEAD -- "${files[@]}"
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -99,15 +103,30 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
             -f tag_name="$TAG" -f target_commitish=main -f previous_tag_name="$PREVIOUS" \
             --jq .body > notes.md
+          # Notes written by hand under "## Unreleased" go into this release, above GitHub's list
+          # of merged pull requests, and the Unreleased section starts over empty.
+          touch CHANGELOG.md
+          unreleased="$(awk '/^## Unreleased/ { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md | sed '/./,$!d')"
+          older="$(awk '/^# Changelog/ { next } /^## Unreleased/ { skip = 1; next } /^## / { skip = 0 } !skip' CHANGELOG.md | sed '/./,$!d')"
+          {
+            if [ -n "$unreleased" ]; then
+              echo "$unreleased"
+              echo
+            fi
+            # GitHub's notes start with a "What's Changed" heading; the version heading replaces it.
+            grep -v "^## What's Changed" notes.md
+          } > release-notes.md
+          mv release-notes.md notes.md
           {
             echo "# Changelog"
             echo
+            echo "## Unreleased"
+            echo
             echo "## $TAG ($(date -u +%Y-%m-%d))"
             echo
-            # GitHub's notes start with a "What's Changed" heading; the version heading replaces it.
-            grep -v "^## What's Changed" notes.md
+            cat notes.md
             echo
-            [ -f CHANGELOG.md ] && tail -n +3 CHANGELOG.md
+            [ -n "$older" ] && echo "$older"
           } > CHANGELOG.new
           mv CHANGELOG.new CHANGELOG.md
 

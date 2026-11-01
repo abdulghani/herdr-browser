@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.3.3 (2026-11-01)
 
 * Add CI checks: unit tests, lint, formatting and knip by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/15

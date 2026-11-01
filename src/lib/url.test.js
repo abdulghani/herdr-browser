@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HOME_URL, SEARCH_URL, chordOf, normalizeUrl } from '../src/input.js';
+import { HOME_URL, SEARCH_URL, displayUrl, normalizeUrl } from './url.js';
 
 describe('normalizeUrl', () => {
   it('goes home for empty input', () => {
@@ -31,28 +31,9 @@ describe('normalizeUrl', () => {
   });
 });
 
-describe('chordOf', () => {
-  const key = (k, mods = {}) => ({ key: k, code: '', ...mods });
-
-  it('names plain keys in lowercase', () => {
-    expect(chordOf(key('T'))).toBe('t');
-    expect(chordOf(key('F3'))).toBe('f3');
-  });
-
-  it('puts modifiers in the order ctrl, alt, cmd, shift', () => {
-    expect(chordOf(key('T', { shift: true, meta: true }))).toBe('cmd+shift+t');
-    expect(chordOf(key('ArrowLeft', { shift: true, alt: true }))).toBe('alt+shift+left');
-    expect(chordOf(key('a', { control: true, alt: true, meta: true, shift: true }))).toBe('ctrl+alt+cmd+shift+a');
-  });
-
-  it('maps arrows, space and shifted symbols', () => {
-    expect(chordOf(key('ArrowUp', { alt: true }))).toBe('alt+up');
-    expect(chordOf({ key: ' ', code: 'Space', control: true })).toBe('ctrl+space');
-    expect(chordOf(key('+', { control: true, shift: true }))).toBe('ctrl+shift+=');
-    expect(chordOf(key('{', { control: true }))).toBe('ctrl+[');
-  });
-
-  it('treats ? as its own key whatever the modifiers', () => {
-    expect(chordOf(key('?', { shift: true }))).toBe('?');
+describe('displayUrl', () => {
+  it('drops the scheme, www. and a trailing slash', () => {
+    expect(displayUrl('https://www.github.com/')).toBe('github.com');
+    expect(displayUrl('http://example.com/a/b')).toBe('example.com/a/b');
   });
 });

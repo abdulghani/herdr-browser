@@ -1,50 +1,11 @@
-// Address bar suggestions: a small browsing history plus fuzzy matching over it and the open tabs.
+// Browsing history for address bar suggestions, ranked by fuzzy matching over it and the open tabs.
 const fs = require('fs');
+const { displayUrl } = require('../../lib/url');
+const { fuzzyMatch } = require('../../lib/fuzzy');
 
 const MAX_HISTORY = 2000;
 const MAX_RESULTS = 8;
 const DAY = 24 * 60 * 60 * 1000;
-
-// What the address bar shows for a URL: no scheme, "www." or trailing slash.
-const displayUrl = (url) =>
-  url
-    .replace(/^[a-z]+:\/\//i, '')
-    .replace(/^www\./, '')
-    .replace(/\/$/, '');
-
-// Fuzzy-match one lowercase token against text: every token character must appear in order.
-// Returns { score, positions } or null. Runs of consecutive characters and matches at the start
-// of a word score higher; too many breaks between matched characters is no match at all, so a
-// short token doesn't match every long URL.
-function fuzzyMatch(token, text) {
-  const lower = text.toLowerCase();
-  // A plain substring match beats any scattered one.
-  const at = lower.indexOf(token);
-  if (at !== -1) {
-    const wordStart = at === 0 || !/[a-z0-9]/.test(lower[at - 1]);
-    return {
-      score: token.length * 4 + (at === 0 ? 10 : wordStart ? 5 : 0),
-      positions: Array.from({ length: token.length }, (_, i) => at + i),
-    };
-  }
-  const positions = [];
-  let score = 0;
-  let breaks = 0;
-  let from = 0;
-  for (const ch of token) {
-    const i = lower.indexOf(ch, from);
-    if (i === -1) return null;
-    const prev = positions[positions.length - 1];
-    if (prev !== undefined && i !== prev + 1) breaks++;
-    score += 1 + (prev !== undefined && i === prev + 1 ? 2 : 0) + (i === 0 || !/[a-z0-9]/.test(lower[i - 1]) ? 3 : 0);
-    positions.push(i);
-    from = i + 1;
-  }
-  // Scattered letters only count when the first one starts a word ("ytb" -> youtube).
-  const firstAtWordStart = positions[0] === 0 || !/[a-z0-9]/.test(lower[positions[0] - 1]);
-  if (breaks > (firstAtWordStart ? Math.max(2, Math.ceil(token.length / 2)) : 1)) return null;
-  return { score, positions };
-}
 
 // Every token must match the title or the URL; positions are kept per field for highlighting.
 function matchItem(tokens, item) {
@@ -145,4 +106,4 @@ function createHistory(file) {
   return { visit, update, suggest, saveNow };
 }
 
-module.exports = { createHistory, fuzzyMatch };
+module.exports = { createHistory };

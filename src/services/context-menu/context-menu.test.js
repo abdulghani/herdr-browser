@@ -1,0 +1,55 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { m, start, useMain, wc, ws } from '../../testing/main-harness.js';
+
+useMain();
+
+describe('context menu', () => {
+  beforeEach(() => start());
+
+  const openMenu = (params) => {
+    wc().emit('context-menu', {}, { x: 10, y: 20, ...params });
+    const menu = m.menus.at(-1);
+    expect(menu.popup).toHaveBeenCalledWith({ window: m.win() });
+    return menu.template;
+  };
+  const item = (template, label) => template.find((i) => i.label === label);
+
+  it('offers link actions', () => {
+    const template = openMenu({ linkURL: 'https://link.example/' });
+    item(template, 'Copy Link Address').click();
+    expect(m.electron.clipboard.writeText).toHaveBeenCalledWith('https://link.example/');
+    item(template, 'Open Link in New Tab').click();
+    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://link.example/']);
+  });
+
+  it('offers editing for fields and copy for selected text', () => {
+    expect(
+      openMenu({ isEditable: true })
+        .map((i) => i.role)
+        .filter(Boolean),
+    ).toEqual(['cut', 'copy', 'paste']);
+    expect(
+      openMenu({ selectionText: 'hi' })
+        .map((i) => i.role)
+        .filter(Boolean),
+    ).toEqual(['copy']);
+    expect(
+      openMenu({})
+        .map((i) => i.role)
+        .filter(Boolean),
+    ).toEqual([]);
+  });
+
+  it('navigates and inspects the page', () => {
+    const page = wc();
+    Object.assign(page, { entries: [{}, {}], activeIndex: 1 });
+    const template = openMenu({});
+    expect(item(template, 'Back').enabled).toBe(true);
+    expect(item(template, 'Forward').enabled).toBe(false);
+    for (const label of ['Back', 'Forward', 'Reload', 'Inspect']) item(template, label).click();
+    expect(page.navigationHistory.goBack).toHaveBeenCalled();
+    expect(page.navigationHistory.goForward).toHaveBeenCalled();
+    expect(page.reload).toHaveBeenCalled();
+    expect(page.inspectElement).toHaveBeenCalledWith(10, 20);
+  });
+});

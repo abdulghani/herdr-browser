@@ -272,7 +272,7 @@ $('address').onkeydown = (e) => {
 };
 
 // ---------- address bar suggestions ----------
-// The list is drawn by an overlay view on top of the page (ui/suggest.html); this side owns the
+// The list is drawn by an overlay view on top of the page (ui/suggestions/index.html); this side owns the
 // rows and the selection, and tells main where to put the overlay.
 
 let suggestionRows = []; // [{ kind: 'typed' | 'tab' | 'history', ... }]

@@ -1,4 +1,4 @@
-// Preload for the address bar suggestions overlay (src/ui/suggest.html).
+// Preload for the address bar suggestions overlay (src/ui/suggestions/index.html).
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('suggestions', {

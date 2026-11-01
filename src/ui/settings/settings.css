@@ -1,4 +1,4 @@
-/* Same colors and font as the browser's own UI (src/ui/styles.css). */
+/* Same colors and font as the browser's own UI (src/ui/browser/styles.css). */
 :root {
   --bg: #0b0d10;
   --panel: #12151a;
