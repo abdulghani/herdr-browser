@@ -63,6 +63,13 @@ attributes or `<style>` blocks: the pages' CSP has no `'unsafe-inline'` (`style:
   Vite doesn't build; the main process loads them from `src/ui/`. They give the pages
   `window.herdr`, `window.suggestions`, `window.downloads` and `window.herdrSettings`.
 
+## Visual style
+
+Anything visible in `src/ui` follows the style guide in
+`.claude/skills/herdr-visual-style/SKILL.md` (a Claude Code skill; other agents can read it as a
+plain document): the color tokens, font, sizes the main process depends on, and how bars, tabs,
+buttons, panels and states look.
+
 ## Checks
 
 Run these before you finish. CI runs the same ones on every pull request.
