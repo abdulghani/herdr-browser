@@ -1,4 +1,4 @@
-# Lint, format check and unit tests on every pull request and push to main.
+# Lint, format check, unused code check (knip) and unit tests on every pull request and push to main.
 name: CI
 
 on:
@@ -36,6 +36,9 @@ jobs:
 
       - name: Formatting
         run: npm run format:check
+
+      - name: Unused files, exports and dependencies
+        run: npm run knip
 
       - name: Unit tests
         run: npm test

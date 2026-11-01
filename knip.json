@@ -1,0 +1,5 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/*preload.js", "src/ui/*.js", "src/settings/*.js"],
+  "project": ["src/**/*.js", "test/**/*.js"]
+}

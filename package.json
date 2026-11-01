@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "knip": "knip",
     "dist": "electron-builder --linux AppImage",
     "dist:mac": "electron-builder --mac dmg --arm64 --x64"
   },
@@ -20,6 +21,7 @@
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",
+    "knip": "^6.44.1",
     "prettier": "^3.9.10",
     "vitest": "^5.0.5"
   },

@@ -49,6 +49,7 @@ npm start               # run from source
 npm test                # unit tests (vitest)
 npm run lint            # eslint
 npm run format          # prettier (npm run format:check only checks)
+npm run knip            # unused files, exports and dependencies
 npm run dist            # build dist/HerdrBrowser-<version>-x86_64.AppImage
 scripts/install-linux.sh   # install the newest build from dist/
 ```
