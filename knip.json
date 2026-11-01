@@ -5,6 +5,7 @@
     "src/ui/page-preload.js",
     "src/ui/browser/renderer.js",
     "src/ui/suggestions/suggest.js",
+    "src/ui/downloads/downloads.js",
     "src/ui/settings/settings.js"
   ],
   "project": ["src/**/*.js"]

@@ -69,8 +69,11 @@ function createKeyboard(ctx) {
   }
 
   function directAction(chord) {
-    // Escape closes the find bar, wherever the focus is.
-    if (chord === 'escape') return ctx.find.has(ctx.workspaces.activeTab().id) ? ctx.find.close : null;
+    // Escape closes the downloads panel or the find bar, wherever the focus is.
+    if (chord === 'escape') {
+      if (ctx.downloads.isOpen()) return ctx.downloads.hide;
+      return ctx.find.has(ctx.workspaces.activeTab().id) ? ctx.find.close : null;
+    }
     return DIRECT_ACTIONS[chord];
   }
 

@@ -14,6 +14,9 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 - Settings open in a tab (`Cmd+,`, the ⚙ button, or `herdr://settings`), with DNS, Shortcuts and
   About sections. DNS: use the system's servers or a secure (DNS over HTTPS) one: Cloudflare,
   Google, Quad9, AdGuard or your own, and test a lookup
+- Downloads save straight to your Downloads folder (`file (1).zip` if the name is taken). A button
+  next to the address bar shows their progress and opens a list of recent ones to open, show in the
+  folder, pause, resume, cancel or retry (`Cmd+Option+L` on macOS, `Ctrl+J` elsewhere)
 
 ## Install
 
@@ -39,7 +42,7 @@ or run `xattr -dr com.apple.quarantine "/Applications/Herdr Browser.app"`.
 To build the dmgs yourself: `npm install && npm run dist:mac` (output in `dist/`).
 
 On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses the address bar,
-`Cmd+1-9` switches tabs, `Cmd+F` finds in the page, `Cmd+Shift+J` opens DevTools, and the app can be picked as the default browser in System Settings → Desktop & Dock.
+`Cmd+1-9` switches tabs, `Cmd+F` finds in the page, `Cmd+Option+L` shows downloads, `Cmd+Shift+J` opens DevTools, and the app can be picked as the default browser in System Settings → Desktop & Dock.
 
 ## Run / build
 
@@ -76,9 +79,11 @@ Tests sit next to the file they test, as `<name>.test.js`.
   - `keyboard/`: keyboard shortcuts
   - `passkeys/`: the passkey notice and opening a page in another browser
   - `context-menu/`: the right-click menu
-- `src/lib/`: small shared functions (URLs, key names, fuzzy matching)
+  - `downloads/`: saving downloads, the list of recent ones, and the downloads panel
+- `src/lib/`: small shared functions (URLs, key names, fuzzy matching, file names, sizes and times)
 - `src/ui/`: the pages: `browser/` (sidebar, tabs, address bar), `suggestions/` (the suggestion
-  list), `settings/` (the settings page), and `page-preload.js` (runs in every web page)
+  list), `downloads/` (the downloads panel), `settings/` (the settings page), and `page-preload.js`
+  (runs in every web page)
 - `src/testing/`: helpers for the tests (not part of the app)
 
 ## Releases
@@ -103,17 +108,18 @@ nothing is released unless `src/` or `CHANGELOG.md` changed since the last relea
 
 Mirrors the herdr config: `Ctrl+Space` is the prefix.
 
-| Action                         | herdr-style                 | Browser-style                  |
-| ------------------------------ | --------------------------- | ------------------------------ |
-| New / close / rename tab       | prefix `c` / `k` / `r`      | `Ctrl+T` / `Ctrl+W`            |
-| New / close / rename workspace | prefix `C` / `K` / `R`      | `Ctrl+Shift+T`                 |
-| Next / previous tab            | `Alt+←/→`, prefix `n` / `p` | `Ctrl+Tab`                     |
-| Next / previous workspace      | `Alt+↑/↓`, prefix `N` / `P` | `Ctrl+1-9` jumps               |
-| Jump to tab                    | `Alt+1-9`, prefix `1-9`     |                                |
-| Move tab / workspace           | `Alt+Shift+arrows`          |                                |
-| Collapse sidebar               | prefix `b`                  | `Ctrl+B`                       |
-| Address bar / back / forward   |                             | `Ctrl+L` / `Ctrl+[` / `Ctrl+]` |
-| Settings                       |                             | `Ctrl+,` (`Cmd+,` on macOS)    |
+| Action                         | herdr-style                 | Browser-style                      |
+| ------------------------------ | --------------------------- | ---------------------------------- |
+| New / close / rename tab       | prefix `c` / `k` / `r`      | `Ctrl+T` / `Ctrl+W`                |
+| New / close / rename workspace | prefix `C` / `K` / `R`      | `Ctrl+Shift+T`                     |
+| Next / previous tab            | `Alt+←/→`, prefix `n` / `p` | `Ctrl+Tab`                         |
+| Next / previous workspace      | `Alt+↑/↓`, prefix `N` / `P` | `Ctrl+1-9` jumps                   |
+| Jump to tab                    | `Alt+1-9`, prefix `1-9`     |                                    |
+| Move tab / workspace           | `Alt+Shift+arrows`          |                                    |
+| Collapse sidebar               | prefix `b`                  | `Ctrl+B`                           |
+| Address bar / back / forward   |                             | `Ctrl+L` / `Ctrl+[` / `Ctrl+]`     |
+| Settings                       |                             | `Ctrl+,` (`Cmd+,` on macOS)        |
+| Downloads                      |                             | `Ctrl+J` (`Cmd+Option+L` on macOS) |
 
 While typing in a text box, `Alt+arrows` (Option on a Mac) move the cursor by word or line as usual,
 and `Alt+Shift+arrows` select text, instead of switching or moving tabs.

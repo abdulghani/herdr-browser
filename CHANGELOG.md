@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Downloads: files save straight to your Downloads folder, and a download button next to the address bar shows their progress and lists recent downloads, where you can open, pause, resume, cancel or retry them (`Cmd+Option+L` on macOS, `Ctrl+J` elsewhere)
+
 ## v0.3.4 (2026-11-01)
 
 * Release only when src/ or CHANGELOG.md changed by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/17

@@ -30,6 +30,19 @@ describe('browser/preload.js (browser window UI)', () => {
     expect(electron.ipcRenderer.on).toHaveBeenCalledTimes(1);
   });
 
+  it('passes on download progress and the request to open the panel', () => {
+    const electron = fakeElectron();
+    runPreload('src/ui/browser/preload.js', electron);
+    const onDownloads = vi.fn();
+    const onShow = vi.fn();
+    electron.exposed.herdr.on('downloads', onDownloads);
+    electron.exposed.herdr.on('show-downloads', onShow);
+    electron.emit('downloads', { active: 1 });
+    electron.emit('show-downloads');
+    expect(onDownloads).toHaveBeenCalledWith({ active: 1 });
+    expect(onShow).toHaveBeenCalled();
+  });
+
   it('reports when a text field has focus', () => {
     const electron = fakeElectron();
     runPreload('src/ui/browser/preload.js', electron);

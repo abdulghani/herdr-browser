@@ -101,6 +101,7 @@ describe('shortcuts and about', () => {
     const list = shortcuts();
     expect(list).toContainEqual(['New tab', 'Ctrl+T']);
     expect(list).toContainEqual(['Close tab', 'Ctrl+W']);
+    expect(list).toContainEqual(['Downloads', 'Ctrl+J']);
     expect(list.find(([action]) => action === 'Reopen closed tab')).toBeUndefined();
   });
 
@@ -110,6 +111,7 @@ describe('shortcuts and about', () => {
     expect(list).toContainEqual(['New tab', 'Cmd+T']);
     expect(list).toContainEqual(['Close tab', 'Ctrl+W']);
     expect(list).toContainEqual(['Reopen closed tab', 'Cmd+Shift+T']);
+    expect(list).toContainEqual(['Downloads', 'Cmd+Option+L']);
   });
 
   it('lists the versions and profile folder', async () => {

@@ -1,5 +1,6 @@
 // A stand-in for the 'electron' module, so src/main.js and the services it loads can be loaded
 // and driven in plain Node. loadMain() gives a fresh copy of them wired to a fresh fake every time.
+import fs from 'node:fs';
 import Module from 'node:module';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -89,8 +90,53 @@ class FakeWebContents extends Emitter {
   }
 }
 
-function createFakeElectron({ userData, home = userData, singleInstance = true, isPackaged = false }) {
-  const paths = { userData, home };
+// A file being downloaded. progress() and finish() play what Chromium reports as it goes.
+class FakeDownloadItem extends Emitter {
+  constructor({ filename = 'file.zip', url = 'https://example.com/file.zip', totalBytes = 1000, startTime = 1700000000 } = {}) {
+    super();
+    Object.assign(this, { filename, url, totalBytes, startTime, receivedBytes: 0, state: 'progressing', paused: false, resumable: false });
+    this.savePath = '';
+    this.getFilename = () => this.filename;
+    this.getURL = () => this.url;
+    this.getTotalBytes = () => this.totalBytes;
+    this.getReceivedBytes = () => this.receivedBytes;
+    this.getState = () => this.state;
+    this.getStartTime = () => this.startTime;
+    this.getSavePath = () => this.savePath;
+    this.isPaused = () => this.paused;
+    this.canResume = () => this.resumable;
+    this.setSavePath = vi.fn((savePath) => (this.savePath = savePath));
+    this.pause = vi.fn(() => (this.paused = true));
+    this.resume = vi.fn(() => {
+      this.paused = false;
+      this.state = 'progressing';
+    });
+    this.cancel = vi.fn(() => this.finish('cancelled'));
+  }
+  progress(receivedBytes, state = 'progressing') {
+    this.receivedBytes = receivedBytes;
+    this.state = state;
+    this.emit('updated', {}, state);
+  }
+  // A completed download leaves its file where it was saved.
+  finish(state = 'completed') {
+    this.state = state;
+    if (state === 'completed') {
+      this.receivedBytes = this.totalBytes || this.receivedBytes;
+      fs.writeFileSync(this.savePath, '');
+    }
+    this.emit('done', {}, state);
+  }
+}
+
+function createFakeElectron({
+  userData,
+  home = userData,
+  downloads = path.join(userData, 'Downloads'),
+  singleInstance = true,
+  isPackaged = false,
+}) {
+  const paths = { userData, home, downloads };
   const handlers = { app: new Emitter(), ipcOn: {}, ipcHandle: {}, protocol: {} };
   const views = [];
   const windows = [];
@@ -160,13 +206,15 @@ function createFakeElectron({ userData, home = userData, singleInstance = true, 
       handle: (channel, fn) => (handlers.ipcHandle[channel] = fn),
     },
     session: {
-      defaultSession: {
+      defaultSession: Object.assign(new Emitter(), {
         resolveHost: vi.fn(),
         clearHostResolverCache: vi.fn(),
         closeAllConnections: vi.fn(),
         setPermissionRequestHandler: vi.fn((fn) => (handlers.permission = fn)),
-      },
+        downloadURL: vi.fn(),
+      }),
     },
+    shell: { openPath: vi.fn(async () => ''), showItemInFolder: vi.fn() },
     Menu: {
       setApplicationMenu: vi.fn(),
       buildFromTemplate: vi.fn((template) => {
@@ -225,6 +273,12 @@ export function loadMain(options) {
       }
     },
     cmd: (name, arg) => handlers.ipcOn.cmd({}, name, arg),
+    // A page starts downloading a file; returns the item to play its progress on.
+    download(options, webContents = {}) {
+      const item = new FakeDownloadItem(options);
+      fake.electron.session.defaultSession.emit('will-download', { preventDefault: vi.fn() }, item, webContents);
+      return item;
+    },
     ipc: (channel, event, ...args) => handlers.ipcOn[channel](event, ...args),
     invoke: (channel, event, ...args) => handlers.ipcHandle[channel](event, ...args),
     // The last state sent to the UI.

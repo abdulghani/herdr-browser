@@ -82,7 +82,10 @@ function createTabViews(ctx) {
     wc.on('did-stop-loading', () => workspaces.broadcast());
     wc.on('before-input-event', (event, input) => ctx.keyboard.handleKey(event, input, wc));
     wc.on('did-start-navigation', (details) => details.isMainFrame && !details.isSameDocument && ctx.keyboard.forgetTextFocus(wc.id));
-    wc.on('focus', () => ctx.suggestions.close());
+    wc.on('focus', () => {
+      ctx.suggestions.close();
+      ctx.downloads.close();
+    });
     wc.setWindowOpenHandler(({ url }) => {
       // Popups and target=_blank open as a new tab in the same workspace.
       const found = workspaces.findTab(tab.id);

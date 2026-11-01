@@ -21,6 +21,7 @@ const { createFind } = require('./services/find/find');
 const { createKeyboard } = require('./services/keyboard/keyboard');
 const { createPasskeys } = require('./services/passkeys/passkeys');
 const { createContextMenu } = require('./services/context-menu/context-menu');
+const { createDownloads } = require('./services/downloads/downloads');
 const { handleUiIpc } = require('./ipc');
 
 app.setName('Herdr Browser');
@@ -46,6 +47,7 @@ ctx.suggestions = createSuggestions(ctx);
 ctx.keyboard = createKeyboard(ctx);
 ctx.passkeys = createPasskeys(ctx);
 ctx.contextMenu = createContextMenu(ctx);
+ctx.downloads = createDownloads(ctx);
 handleUiIpc(ctx);
 handleSettingsIpc(ctx);
 
@@ -70,10 +72,14 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'ui', 'browser', 'index.html'));
   win.webContents.on('before-input-event', (event, input) => ctx.keyboard.handleKey(event, input, win.webContents));
   win.on('resize', () => ctx.views.layout());
-  win.on('blur', () => ctx.suggestions.close());
+  win.on('blur', () => {
+    ctx.suggestions.close();
+    ctx.downloads.close();
+  });
   win.on('close', () => {
     ctx.session.saveNow();
     ctx.history.saveNow();
+    ctx.downloads.saveNow();
   });
   win.webContents.once('did-finish-load', () => {
     windowReady = true;
@@ -125,6 +131,7 @@ app.whenReady().then(() => {
   applyDns(app, session.defaultSession, ctx.settings.get().dns);
   serveSettingsPage();
   handlePermissions(ctx);
+  ctx.downloads.start();
   createWindow();
   ctx.sleeping.start();
 });

@@ -652,6 +652,75 @@ describe('drag and drop', () => {
   });
 });
 
+describe('download button', () => {
+  const downloads = (changes) => ({ any: true, active: 0, progress: null, open: false, ...changes });
+  const button = () => $('downloads');
+  const ring = () => $('downloads-ring').getAttribute('stroke-dasharray');
+  const placeAt = (id, left) => ($(id).getBoundingClientRect = () => ({ left, bottom: 70, width: 28 }));
+
+  it('shows once there is a download', () => {
+    emit('state', makeState());
+    expect(button().hidden).toBe(true);
+    emit('state', makeState({ downloads: downloads({ any: false }) }));
+    expect(button().hidden).toBe(true);
+    emit('state', makeState({ downloads: downloads() }));
+    expect(button().hidden).toBe(false);
+    expect(button().classList.contains('running')).toBe(false);
+    expect(button().title).toBe('Downloads (Cmd+Option+L)');
+  });
+
+  it('fills the ring as files download, or spins when the size is unknown', () => {
+    emit('state', makeState({ downloads: downloads({ active: 1, progress: 0.42 }) }));
+    expect(button().classList.contains('running')).toBe(true);
+    expect(button().classList.contains('indeterminate')).toBe(false);
+    expect(ring()).toBe('42 100');
+    expect(button().title).toBe('Downloading 1 file (Cmd+Option+L)');
+    // Progress comes on its own message.
+    emit('downloads', downloads({ active: 2, progress: null, open: true }));
+    expect(button().classList.contains('indeterminate')).toBe(true);
+    expect(button().classList.contains('open')).toBe(true);
+    expect(ring()).toBe('25 100');
+    expect(button().title).toBe('Downloading 2 files (Cmd+Option+L)');
+  });
+
+  it('takes progress before any state arrives', () => {
+    emit('downloads', downloads({ active: 1, progress: 0.5 }));
+    expect(ring()).toBe('50 100');
+  });
+
+  it('toggles the panel under the button', () => {
+    emit('state', makeState({ downloads: downloads() }));
+    placeAt('downloads', 1300);
+    button().click();
+    expect(herdr.cmd).toHaveBeenLastCalledWith('toggleDownloads', { x: 1300, y: 70, width: 28 });
+    emit('show-downloads');
+    expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', { x: 1300, y: 70, width: 28 });
+  });
+
+  it('places the panel under settings while there is no button', () => {
+    emit('state', makeState());
+    placeAt('settings', 1340);
+    emit('show-downloads');
+    expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', { x: 1340, y: 70, width: 28 });
+  });
+
+  it('moves the open panel along when the window resizes', () => {
+    window.dispatchEvent(new Event('resize'));
+    emit('state', makeState({ downloads: downloads() }));
+    window.dispatchEvent(new Event('resize'));
+    expect(herdr.cmd).not.toHaveBeenCalled();
+    emit('downloads', downloads({ open: true }));
+    window.dispatchEvent(new Event('resize'));
+    expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', expect.any(Object));
+  });
+
+  it('names the other keys elsewhere', async () => {
+    await start('linux');
+    emit('state', makeState({ downloads: downloads() }));
+    expect(button().title).toBe('Downloads (Ctrl+J)');
+  });
+});
+
 describe('other platforms', () => {
   it('marks the platform', async () => {
     await start('linux');

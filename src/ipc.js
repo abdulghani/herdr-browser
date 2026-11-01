@@ -33,6 +33,9 @@ function commands(ctx) {
     dismissNotice: () => ctx.passkeys.dismiss(),
     openExternally: () => ctx.passkeys.openExternally(),
     focusContent: () => ctx.views.focusContent(),
+    toggleDownloads: (rect) => ctx.downloads.toggle(rect),
+    showDownloads: (rect) => ctx.downloads.show(rect),
+    hideDownloads: () => ctx.downloads.hide(),
   };
 }
 
