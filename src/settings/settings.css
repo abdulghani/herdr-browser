@@ -1,0 +1,153 @@
+/* Same colors and font as the browser's own UI (src/ui/styles.css). */
+:root {
+  --bg: #0b0d10;
+  --panel: #12151a;
+  --panel-2: #1a1e25;
+  --border: #252a33;
+  --fg: #c9d1d9;
+  --muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-fg: #0b0d10;
+  --error: #f85149;
+  --ok: #3fb950;
+  color-scheme: dark;
+  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Settings title on top, tab list down the left, the open tab's panel on the right. */
+main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: start;
+}
+main h1 { grid-column: 1 / -1; }
+
+@media (max-width: 560px) {
+  main { grid-template-columns: minmax(0, 1fr); row-gap: 16px; }
+}
+
+h1 { font-size: 20px; margin: 0 0 20px; }
+h2 { font-size: 15px; margin: 0 0 6px; }
+h3 { font-size: 13px; margin: 28px 0 8px; }
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.hint { color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+
+.provider {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.provider:hover { background: var(--panel-2); }
+.provider input { accent-color: var(--accent); margin: 0; transform: translateY(1px); }
+.provider .detail { color: var(--muted); font-size: 12px; }
+
+#custom-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0 34px;
+}
+#custom-row[hidden] { display: none; }
+#custom-row span { color: var(--muted); font-size: 12px; }
+
+input[type="url"], #resolve-host {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  height: 30px;
+  padding: 0 10px;
+  outline: none;
+  min-width: 0;
+}
+input[type="url"]:focus, #resolve-host:focus { border-color: var(--accent); }
+
+button {
+  font: inherit;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.row { display: flex; gap: 8px; }
+.row input { flex: 1; }
+
+#dns-status { font-size: 12px; color: var(--muted); }
+#dns-status.ok { color: var(--ok); }
+#dns-status.error, #resolve-result .error { color: var(--error); }
+
+#resolve-result { list-style: none; margin: 10px 0 0; padding: 0; font-size: 12px; }
+#resolve-result li { padding: 2px 0; overflow-wrap: anywhere; }
+#resolve-result .family { color: var(--muted); display: inline-block; width: 44px; }
+
+/* Vertical tab list. */
+#tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 16px;
+}
+#tabs button {
+  height: 32px;
+  padding: 0 12px;
+  text-align: left;
+  background: none;
+  color: var(--muted);
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+}
+#tabs button:hover { color: var(--fg); background: var(--panel); }
+#tabs button[aria-selected="true"] { color: var(--fg); background: var(--panel-2); border-left-color: var(--accent); border-radius: 0 6px 6px 0; }
+#tabs button:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+kbd {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+
+#shortcut-list { width: 100%; border-collapse: collapse; }
+#shortcut-list td { padding: 7px 0; border-top: 1px solid var(--border); }
+#shortcut-list tr:first-child td { border-top: 0; }
+#shortcut-list td:last-child { text-align: right; }
+
+#about-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin: 0 0 16px; }
+#about-list dt { color: var(--muted); }
+#about-list dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
+
+a { color: var(--accent); }

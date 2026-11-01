@@ -1,10 +1,12 @@
 // Herdr Browser: herdr's layout applied to a Chromium browser.
 // herdr workspace -> sidebar entry (vertical), herdr tab -> tab strip entry (horizontal).
-const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu, clipboard, protocol, net } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { createHistory } = require('./suggest');
+const { DNS_PROVIDERS, createSettings, applyDns } = require('./settings');
 
 const SIDEBAR_WIDTH = 220;
 const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
@@ -15,6 +17,7 @@ const HOME_URL = 'https://www.google.com';
 const BLANK_URL = 'about:blank'; // new tabs start here, with the address bar focused
 const BLANK_BG = '#0b0d10'; // --bg in styles.css, so a blank tab isn't a white flash
 const SEARCH_URL = 'https://www.google.com/search?q=';
+const SETTINGS_URL = 'herdr://settings/';
 // Background tabs not looked at for this long are unloaded to free memory (like Chrome's
 // Memory Saver) and reload, with their back/forward history, when selected again.
 const SLEEP_AFTER_MS = 10 * 60 * 1000;
@@ -39,6 +42,10 @@ let prefixArmed = false;
 let prefixTimer = null;
 let saveTimer = null;
 let browsingHistory; // for address bar suggestions
+let settings;
+
+// herdr:// pages (the settings page) behave like https pages: own origin, fetch, storage.
+protocol.registerSchemesAsPrivileged([{ scheme: 'herdr', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 // ---------- state ----------
 
@@ -158,7 +165,7 @@ function createView(tab) {
     browsingHistory.update(wc.getURL(), { title });
   });
   // Pages with no background of their own paint over the view's color, so only darken blank tabs.
-  const paintBackground = (url) => view.setBackgroundColor(url === BLANK_URL ? BLANK_BG : '#ffffff');
+  const paintBackground = (url) => view.setBackgroundColor(url === BLANK_URL || url.startsWith('herdr:') ? BLANK_BG : '#ffffff');
   paintBackground(tab.url);
   wc.on('did-start-navigation', (details) => details.isMainFrame && paintBackground(details.url));
   wc.on('page-favicon-updated', (_e, favicons) => {
@@ -435,6 +442,13 @@ function toggleSidebar() {
 
 const activeWc = () => views.get(activeTab().id)?.webContents;
 
+// Settings open in a tab; if one is already open anywhere, switch to it.
+function openSettings() {
+  const found = state.workspaces.flatMap((ws) => ws.tabs).find((t) => t.url.startsWith('herdr://settings'));
+  if (found) return COMMANDS.selectTab(found.id);
+  openTab(SETTINGS_URL, activeWs(), activeWs().activeTab + 1);
+}
+
 function focusAddressBar() {
   win.webContents.focus();
   win.webContents.send('focus-address');
@@ -618,6 +632,8 @@ const DIRECT_ACTIONS = {
   'alt+shift+up': () => moveWorkspace(-1),
   'alt+shift+down': () => moveWorkspace(1),
   'ctrl+t': () => openTab(),
+  'cmd+,': () => openSettings(),
+  'ctrl+,': () => openSettings(),
   'cmd+t': () => openTab(),
   'cmd+shift+t': () => reopenClosed(),
   'ctrl+f': () => openFind(),
@@ -759,6 +775,7 @@ const COMMANDS = {
   reload: () => activeWc()?.reload(),
   stop: () => activeWc()?.stop(),
   newTab: () => openTab(),
+  openSettings: () => openSettings(),
   closeTab: (tabId) => closeTab(tabId),
   selectTab: (tabId) => {
     const found = findTab(tabId);
@@ -827,6 +844,37 @@ ipcMain.on('passkey-request', (e) => {
 });
 ipcMain.on('ready', () => broadcast());
 ipcMain.on('text-focus', (e, typing) => (typing ? textFocus.add(e.sender.id) : textFocus.delete(e.sender.id)));
+// Only the settings page itself may use these.
+const fromSettingsPage = (e) => e.senderFrame === e.sender.mainFrame && e.senderFrame.url.startsWith('herdr://settings');
+ipcMain.handle(
+  'settings-get',
+  (e) =>
+    fromSettingsPage(e) && {
+      settings: settings.get(),
+      providers: DNS_PROVIDERS.map(({ url, ...p }) => p),
+      about: {
+        version: app.getVersion(),
+        chrome: process.versions.chrome,
+        electron: process.versions.electron,
+        platform: process.platform,
+        profile: app.getPath('userData'),
+      },
+    },
+);
+ipcMain.handle('settings-set-dns', (e, dns) => {
+  if (!fromSettingsPage(e)) return;
+  applyDns(app, session.defaultSession, settings.setDns(dns));
+});
+ipcMain.handle('settings-resolve', async (e, host) => {
+  if (!fromSettingsPage(e)) return;
+  try {
+    const { endpoints } = await session.defaultSession.resolveHost(String(host).trim(), { cacheUsage: 'disallowed' });
+    return { addresses: endpoints };
+  } catch (err) {
+    return { error: err.message.replace(/^net::/, '') };
+  }
+});
+
 ipcMain.handle('suggest', (_e, query) => {
   const current = activeTab().id;
   const openTabs = state.workspaces.flatMap((ws) =>
@@ -904,9 +952,27 @@ app.on('open-file', (e, file) => {
   openExternalUrl(`file://${file}`);
 });
 
+// herdr://settings/<file> serves src/settings/<file>.
+function serveSettingsPage() {
+  const root = path.join(__dirname, 'settings');
+  protocol.handle('herdr', async (request) => {
+    const { host, pathname } = new URL(request.url);
+    const file = path.join(root, decodeURIComponent(pathname === '/' ? '/index.html' : pathname));
+    if (host !== 'settings' || !file.startsWith(root + path.sep)) return new Response('Not found', { status: 404 });
+    const response = await net.fetch(pathToFileURL(file).href).catch(() => new Response('Not found', { status: 404 }));
+    // Other pages may link to settings but not frame it.
+    const headers = new Headers(response.headers);
+    headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+    return new Response(response.body, { status: response.status, headers });
+  });
+}
+
 app.whenReady().then(() => {
   state = loadState();
   browsingHistory = createHistory(path.join(app.getPath('userData'), 'history.json'));
+  settings = createSettings(path.join(app.getPath('userData'), 'settings.json'));
+  applyDns(app, session.defaultSession, settings.get().dns);
+  serveSettingsPage();
   // Grant the everyday permissions; refuse the rest (no prompt UI yet).
   const allowed = new Set(['notifications', 'media', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {

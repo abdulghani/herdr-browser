@@ -55,3 +55,12 @@ const isTextField = (el) =>
 const reportTextFocus = (e) => ipcRenderer.send('text-focus', e.type === 'focusin' && isTextField(e.composedPath()[0]));
 window.addEventListener('focusin', reportTextFocus, true);
 window.addEventListener('focusout', reportTextFocus, true);
+
+// The settings page (herdr://settings) reads and changes settings; no other page gets this.
+if (location.protocol === 'herdr:' && location.host === 'settings') {
+  contextBridge.exposeInMainWorld('herdrSettings', {
+    get: () => ipcRenderer.invoke('settings-get'),
+    setDns: (dns) => ipcRenderer.invoke('settings-set-dns', dns),
+    resolve: (host) => ipcRenderer.invoke('settings-resolve', host),
+  });
+}
