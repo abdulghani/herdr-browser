@@ -170,6 +170,26 @@ jobs:
 
       - run: npx electron-builder ${{ matrix.args }} --publish never
 
+      # The About tab in settings shows the version from the app's package.json; make sure every
+      # build carries the new one before it's published.
+      - name: Check the built apps report the new version
+        env:
+          TAG: ${{ needs.bump.outputs.tag }}
+        run: |
+          # shellcheck disable=SC2016 # the ${...} below is JavaScript, not shell
+          node -e '
+            const asar = require("@electron/asar");
+            const { globSync } = require("node:fs");
+            const want = process.env.TAG.replace(/^v/, "");
+            const apps = globSync("dist/**/app.asar");
+            if (!apps.length) throw new Error("No app.asar found in dist/");
+            for (const app of apps) {
+              const got = JSON.parse(asar.extractFile(app, "package.json")).version;
+              console.log(`${app}: ${got}`);
+              if (got !== want) throw new Error(`${app} reports ${got}, expected ${want}`);
+            }
+          '
+
       - uses: actions/upload-artifact@v4
         with:
           name: app-${{ matrix.os }}

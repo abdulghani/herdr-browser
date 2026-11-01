@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { press } from '../../testing/fake-electron.js';
 import { dir, m, settingsEvent, start, tab, ui, useMain, ws } from '../../testing/main-harness.js';
 
+// The About tab must show the version the release workflow writes to package.json.
+const packageVersion = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../../../package.json'), 'utf8')).version;
+
 useMain();
 
 describe('settings', () => {
@@ -36,7 +39,7 @@ describe('settings', () => {
     expect(result.settings).toEqual({ dns: { provider: 'system', customUrl: '' } });
     expect(result.providers.map((p) => p.id)).toContain('cloudflare');
     expect(result.providers.every((p) => !('url' in p))).toBe(true);
-    expect(result.about).toMatchObject({ version: '0.3.3', platform: 'linux', profile: dir });
+    expect(result.about).toMatchObject({ version: packageVersion, platform: 'linux', profile: dir });
   });
 
   it('saves and applies a DNS choice', () => {
