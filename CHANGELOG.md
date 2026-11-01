@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v0.3.6 (2026-11-01)
+
+* Add a visual style skill for the UI by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/25
+* Rebuild the UI with Svelte 5 and Tailwind CSS 4, built by Vite by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/24
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.5...v0.3.6
+
 ## v0.3.5 (2026-11-01)
 
 - Downloads: files save straight to your Downloads folder, and a download button next to the address bar shows their progress and lists recent downloads, where you can open, pause, resume, cancel or retry them (`Cmd+Option+L` on macOS, `Ctrl+J` elsewhere)
