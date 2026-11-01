@@ -4,6 +4,9 @@
   "version": "0.3.6",
   "description": "Chromium browser with herdr-style layout: vertical workspaces, horizontal tabs inside each",
   "main": "src/main.js",
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
     "build:ui": "vite build",
     "start": "npm run build:ui && electron .",
@@ -106,5 +109,9 @@
     "dmg": {
       "title": "Herdr Browser ${version}"
     }
+  },
+  "allowScripts": {
+    "electron-winstaller": false,
+    "fsevents": false
   }
 }

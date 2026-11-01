@@ -15,27 +15,24 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  NODE_VERSION: 22
-
 jobs:
   install:
     name: Install dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
 
       - name: Restore node_modules
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
-          # Same OS, Node version and lockfile -> same node_modules.
-          key: node-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+          # Same OS, Node version (.nvmrc) and lockfile -> same node_modules.
+          key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
 
       - name: Install
         if: steps.cache.outputs.cache-hit != 'true'
@@ -65,18 +62,18 @@ jobs:
           - name: Build UI
             run: npm run build:ui
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
 
       - name: Restore node_modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: node_modules
-          # Same OS, Node version and lockfile -> same node_modules.
-          key: node-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+          # Same OS, Node version (.nvmrc) and lockfile -> same node_modules.
+          key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
           fail-on-cache-miss: true
 
       - name: ${{ matrix.name }}

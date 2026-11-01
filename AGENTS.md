@@ -72,7 +72,8 @@ buttons, panels and states look.
 
 ## Checks
 
-Run these before you finish. CI runs the same ones on every pull request.
+Use Node.js 26 (`.nvmrc`; `nvm use`). Run these before you finish. CI runs the same ones, on the
+same Node version, on every pull request.
 
 ```sh
 npm run lint            # eslint, including a cyclomatic complexity limit of 12 per function
