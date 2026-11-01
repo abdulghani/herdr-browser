@@ -846,7 +846,21 @@ ipcMain.on('ready', () => broadcast());
 ipcMain.on('text-focus', (e, typing) => (typing ? textFocus.add(e.sender.id) : textFocus.delete(e.sender.id)));
 // Only the settings page itself may use these.
 const fromSettingsPage = (e) => e.senderFrame === e.sender.mainFrame && e.senderFrame.url.startsWith('herdr://settings');
-ipcMain.handle('settings-get', (e) => fromSettingsPage(e) && { settings: settings.get(), providers: DNS_PROVIDERS.map(({ url, ...p }) => p) });
+ipcMain.handle(
+  'settings-get',
+  (e) =>
+    fromSettingsPage(e) && {
+      settings: settings.get(),
+      providers: DNS_PROVIDERS.map(({ url, ...p }) => p),
+      about: {
+        version: app.getVersion(),
+        chrome: process.versions.chrome,
+        electron: process.versions.electron,
+        platform: process.platform,
+        profile: app.getPath('userData'),
+      },
+    },
+);
 ipcMain.handle('settings-set-dns', (e, dns) => {
   if (!fromSettingsPage(e)) return;
   applyDns(app, session.defaultSession, settings.setDns(dns));

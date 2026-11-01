@@ -23,13 +23,23 @@ body {
   color: var(--fg);
 }
 
+/* Settings title on top, tab list down the left, the open tab's panel on the right. */
 main {
-  max-width: 640px;
+  max-width: 860px;
   margin: 0 auto;
   padding: 32px 16px 64px;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: start;
+}
+main h1 { grid-column: 1 / -1; }
+
+@media (max-width: 560px) {
+  main { grid-template-columns: minmax(0, 1fr); row-gap: 16px; }
 }
 
-h1 { font-size: 20px; margin: 0 0 24px; }
+h1 { font-size: 20px; margin: 0 0 20px; }
 h2 { font-size: 15px; margin: 0 0 6px; }
 h3 { font-size: 13px; margin: 28px 0 8px; }
 
@@ -99,3 +109,45 @@ button:disabled { opacity: 0.5; cursor: default; }
 #resolve-result { list-style: none; margin: 10px 0 0; padding: 0; font-size: 12px; }
 #resolve-result li { padding: 2px 0; overflow-wrap: anywhere; }
 #resolve-result .family { color: var(--muted); display: inline-block; width: 44px; }
+
+/* Vertical tab list. */
+#tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 16px;
+}
+#tabs button {
+  height: 32px;
+  padding: 0 12px;
+  text-align: left;
+  background: none;
+  color: var(--muted);
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+}
+#tabs button:hover { color: var(--fg); background: var(--panel); }
+#tabs button[aria-selected="true"] { color: var(--fg); background: var(--panel-2); border-left-color: var(--accent); border-radius: 0 6px 6px 0; }
+#tabs button:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+kbd {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+
+#shortcut-list { width: 100%; border-collapse: collapse; }
+#shortcut-list td { padding: 7px 0; border-top: 1px solid var(--border); }
+#shortcut-list tr:first-child td { border-top: 0; }
+#shortcut-list td:last-child { text-align: right; }
+
+#about-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin: 0 0 16px; }
+#about-list dt { color: var(--muted); }
+#about-list dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
+
+a { color: var(--accent); }

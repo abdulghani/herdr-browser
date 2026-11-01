@@ -17,8 +17,84 @@ function setStatus(text, kind = '') {
   $('dns-status').className = kind;
 }
 
+// ---------- tabs ----------
+
+// The open tab is kept in the URL (herdr://settings/#shortcuts), so a reload stays on it.
+function showTab(name) {
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  const tab = tabs.find((t) => t.dataset.tab === name) || tabs[0];
+  for (const t of tabs) {
+    const selected = t === tab;
+    t.setAttribute('aria-selected', selected);
+    t.tabIndex = selected ? 0 : -1;
+    $(t.dataset.tab).hidden = !selected;
+  }
+  history.replaceState(null, '', `#${tab.dataset.tab}`);
+  return tab;
+}
+
+$('tabs').onclick = (e) => e.target.dataset.tab && showTab(e.target.dataset.tab);
+// Up/down arrows move between tabs, like a native tab list.
+$('tabs').onkeydown = (e) => {
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  e.preventDefault();
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  const i = tabs.indexOf(document.activeElement) + (e.key === 'ArrowDown' ? 1 : -1);
+  showTab(tabs[(i + tabs.length) % tabs.length].dataset.tab).focus();
+};
+showTab(location.hash.slice(1));
+
+// ---------- shortcuts ----------
+
+// [action, keys elsewhere, keys on macOS (when different)]
+const SHORTCUTS = [
+  ['New tab', 'Ctrl+T', 'Cmd+T'],
+  ['Close tab', 'Ctrl+W'],
+  ['Reopen closed tab', null, 'Cmd+Shift+T'],
+  ['New workspace', 'Ctrl+Shift+T'],
+  ['Next / previous tab', 'Alt+→ / Alt+←, Ctrl+Tab'],
+  ['Jump to tab', 'Alt+1–9', 'Cmd+1–9'],
+  ['Next / previous workspace', 'Alt+↓ / Alt+↑'],
+  ['Jump to workspace', 'Ctrl+1–9'],
+  ['Move tab / workspace', 'Alt+Shift+arrows'],
+  ['Address bar', 'Ctrl+L', 'Cmd+L'],
+  ['Find in page', 'Ctrl+F', 'Cmd+F'],
+  ['Back / forward', 'Ctrl+[ / Ctrl+]'],
+  ['Reload', 'Ctrl+R'],
+  ['Collapse sidebar', 'Ctrl+B'],
+  ['Developer tools', 'Ctrl+Shift+I', 'Cmd+Shift+J'],
+  ['Settings', 'Ctrl+,', 'Cmd+,'],
+  ['Rename tab / workspace', 'Prefix R / Prefix Shift+R'],
+  ['Show key help', 'Prefix ?'],
+];
+
+function renderShortcuts(platform) {
+  const mac = platform === 'darwin';
+  $('shortcut-list').replaceChildren(
+    ...SHORTCUTS.filter(([, other, macKeys]) => (mac ? macKeys || other : other)).map(([action, other, macKeys]) =>
+      el('tr', {}, [el('td', { textContent: action }), el('td', {}, [el('kbd', { textContent: mac ? macKeys || other : other })])]),
+    ),
+  );
+}
+
+// ---------- about ----------
+
+function renderAbout(about) {
+  const rows = [
+    ['Version', about.version],
+    ['Chromium', about.chrome],
+    ['Electron', about.electron],
+    ['Profile folder', about.profile],
+  ];
+  $('about-list').replaceChildren(...rows.flatMap(([name, value]) => [el('dt', { textContent: name }), el('dd', { textContent: value })]));
+}
+
+// ---------- DNS ----------
+
 async function load() {
-  const { settings, providers } = await api.get();
+  const { settings, providers, about } = await api.get();
+  renderShortcuts(about.platform);
+  renderAbout(about);
   $('dns-providers').replaceChildren(
     ...providers.map((p) =>
       el('label', { className: 'provider' }, [

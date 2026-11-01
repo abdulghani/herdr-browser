@@ -10,8 +10,14 @@
 <body>
   <main>
     <h1>Settings</h1>
+    <nav id="tabs" role="tablist" aria-orientation="vertical">
+      <button role="tab" data-tab="dns">DNS</button>
+      <button role="tab" data-tab="shortcuts">Shortcuts</button>
+      <button role="tab" data-tab="about">About</button>
+    </nav>
 
-    <section>
+    <div id="panels">
+    <section role="tabpanel" id="dns" hidden>
       <h2>DNS</h2>
       <p class="hint">Which server the browser asks to turn site names into addresses. The servers other
         than the system default use DNS over HTTPS: lookups are encrypted, so your network can't see or
@@ -35,6 +41,20 @@
       </form>
       <ul id="resolve-result"></ul>
     </section>
+
+    <section role="tabpanel" id="shortcuts" hidden>
+      <h2>Shortcuts</h2>
+      <p class="hint">herdr-style keys start with the prefix <kbd>Ctrl+Space</kbd>, then one key.
+        While typing in a text box, <kbd>Alt</kbd>+arrows move the cursor instead.</p>
+      <table id="shortcut-list"></table>
+    </section>
+
+    <section role="tabpanel" id="about" hidden>
+      <h2>About</h2>
+      <dl id="about-list"></dl>
+      <p class="hint"><a href="https://github.com/abdulghani/herdr-browser" target="_blank">github.com/abdulghani/herdr-browser</a></p>
+    </section>
+    </div>
   </main>
   <script src="settings.js"></script>
 </body>

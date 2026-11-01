@@ -11,9 +11,9 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 - Closed tabs and workspaces can be reopened (`Cmd+Shift+T` on macOS), even after a restart
 - Tabs left unviewed for 10 minutes sleep to free memory (dimmed icon in a dashed ring) and
   reload, with their history, when selected; tabs in a call or playing sound stay awake
-- Settings open in a tab (`Cmd+,`, the ⚙ button, or `herdr://settings`). DNS: use the system's
-  servers or a secure (DNS over HTTPS) one: Cloudflare, Google, Quad9, AdGuard or your own,
-  and test a lookup
+- Settings open in a tab (`Cmd+,`, the ⚙ button, or `herdr://settings`), with DNS, Shortcuts and
+  About sections. DNS: use the system's servers or a secure (DNS over HTTPS) one: Cloudflare,
+  Google, Quad9, AdGuard or your own, and test a lookup
 
 ## Install
 
