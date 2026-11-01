@@ -3,10 +3,11 @@
 const { WebContentsView, ipcMain } = require('electron');
 const path = require('path');
 const { BLANK_URL } = require('../../lib/url');
+const { uiPage } = require('../../lib/ui-build');
 
-const SUGGEST_ROW_HEIGHT = 32; // .sg height in src/ui/browser/styles.css
-const SUGGEST_PADDING = 10; // #suggestions padding + border, top and bottom
-const UI_DIR = path.join(__dirname, '..', '..', 'ui', 'suggestions');
+const SUGGEST_ROW_HEIGHT = 32; // row height (h-8) in src/ui/suggestions/SuggestionRow.svelte
+const SUGGEST_PADDING = 10; // the list's padding + border, top and bottom (src/ui/suggestions/App.svelte)
+const PRELOAD = path.join(__dirname, '..', '..', 'ui', 'suggestions', 'preload.js');
 
 function createSuggestions(ctx) {
   let suggestView = null;
@@ -19,11 +20,11 @@ function createSuggestions(ctx) {
           contextIsolation: true,
           sandbox: true,
           nodeIntegration: false,
-          preload: path.join(UI_DIR, 'preload.js'),
+          preload: PRELOAD,
         },
       });
       suggestView.setBackgroundColor('#00000000');
-      suggestView.webContents.loadFile(path.join(UI_DIR, 'index.html'));
+      suggestView.webContents.loadFile(uiPage('suggestions'));
     }
     const send = () => suggestView.webContents.send('suggest-rows', { rows, selected });
     if (suggestView.webContents.isLoading()) suggestView.webContents.once('did-finish-load', send);

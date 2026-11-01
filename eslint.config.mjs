@@ -1,10 +1,12 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import prettier from 'eslint-config-prettier';
+import svelte from 'eslint-plugin-svelte';
 
 export default [
-  { ignores: ['dist/', 'node_modules/', 'coverage/'] },
+  { ignores: ['dist/', 'dist-ui/', 'node_modules/', 'coverage/'] },
   js.configs.recommended,
+  ...svelte.configs.recommended,
   // Main process: the entry point, its services and shared functions.
   {
     files: ['src/*.js', 'src/services/**/*.js', 'src/lib/**/*.js'],
@@ -15,17 +17,18 @@ export default [
     files: ['src/ui/**/preload.js', 'src/ui/page-preload.js'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
   },
-  // The browser UI, suggestions and downloads overlays and settings page are plain browser scripts.
+  // The pages: Svelte components and the modules next to them, built by Vite for the browser.
   {
-    files: ['src/ui/browser/renderer.js', 'src/ui/suggestions/suggest.js', 'src/ui/downloads/downloads.js', 'src/ui/settings/settings.js'],
-    languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
+    files: ['src/ui/**/*.svelte', 'src/ui/**/*.svelte.js', 'src/ui/**/main.js', 'src/ui/*/*.js'],
+    ignores: ['src/ui/**/preload.js'],
+    languageOptions: { sourceType: 'module', globals: { ...globals.browser } },
   },
   // Tests (next to the files they test), their helpers and the config files are ES modules.
   {
     files: ['src/**/*.test.js', 'src/testing/**/*.js', '*.config.{js,mjs}'],
     languageOptions: { sourceType: 'module', globals: { ...globals.node } },
   },
-  // Tests of the UI scripts and preloads run in jsdom, which provides the browser globals.
+  // Tests of the UI and preloads run in jsdom, which provides the browser globals.
   {
     files: ['src/ui/**/*.test.js', 'src/testing/dom.js'],
     languageOptions: { globals: { ...globals.browser } },
@@ -34,11 +37,12 @@ export default [
     rules: {
       // `catch {}` is used on purpose where a failure just means "use the default".
       'no-empty': ['error', { allowEmptyCatch: true }],
-      // Keep functions small enough to follow: at most 12 paths through each one.
+      // Keep functions small enough to follow: at most 12 paths through each one (also in .svelte files).
       complexity: ['error', 12],
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true }],
     },
   },
   // Formatting is Prettier's job.
   prettier,
+  ...svelte.configs.prettier,
 ];

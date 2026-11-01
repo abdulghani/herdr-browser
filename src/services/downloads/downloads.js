@@ -6,17 +6,18 @@ const path = require('path');
 const fs = require('fs');
 const { uniqueName } = require('../../lib/files');
 const { formatBytes, formatDuration } = require('../../lib/format');
+const { uiPage } = require('../../lib/ui-build');
 
 const MAX_ENTRIES = 50;
 const UPDATE_EVERY = 250; // ms between progress updates for one download; state changes go at once
 const AUTO_CLOSE = 5000; // ms the panel stays open when a new download opened it and it isn't pointed at
-const PANEL_WIDTH = 360; // .dl-panel in src/ui/downloads/downloads.css
-const HEADER_HEIGHT = 40; // .dl-header height
-const ROW_HEIGHT = 52; // .dl height
-const PANEL_PADDING = 10; // .dl-panel border + #dl-list padding, top and bottom
+const PANEL_WIDTH = 360; // the panel's width in src/ui/downloads/App.svelte
+const HEADER_HEIGHT = 40; // its header's height (h-10)
+const ROW_HEIGHT = 52; // a row's height in src/ui/downloads/DownloadRow.svelte
+const PANEL_PADDING = 10; // the panel's border + the list's padding, top and bottom
 const MAX_HEIGHT = 440;
 const MARGIN = 8; // space kept between the panel and the window's edges
-const UI_DIR = path.join(__dirname, '..', '..', 'ui', 'downloads');
+const PRELOAD = path.join(__dirname, '..', '..', 'ui', 'downloads', 'preload.js');
 const SAVED_FIELDS = ['id', 'filename', 'url', 'savePath', 'receivedBytes', 'totalBytes', 'state', 'startTime', 'endTime'];
 
 const sum = (list, field) => list.reduce((total, e) => total + e[field], 0);
@@ -241,10 +242,10 @@ function createDownloads(ctx) {
 
   function createPanel() {
     panel = new WebContentsView({
-      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(UI_DIR, 'preload.js') },
+      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD },
     });
     panel.setBackgroundColor('#00000000');
-    panel.webContents.loadFile(path.join(UI_DIR, 'index.html'));
+    panel.webContents.loadFile(uiPage('downloads'));
     // Shortcuts (and Escape) still work while the panel has the focus.
     panel.webContents.on('before-input-event', (event, input) => ctx.keyboard.handleKey(event, input, panel.webContents));
     panel.webContents.on('did-finish-load', () => open && sendRows());

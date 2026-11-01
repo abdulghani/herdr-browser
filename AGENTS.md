@@ -19,14 +19,18 @@ src/
     passkeys/      the passkey notice and opening a page in another browser
     context-menu/  the right-click menu
     downloads/     saving downloads, the list of recent ones (downloads.json) and the downloads panel
-  lib/             small shared functions with no Electron in them (url, keys, fuzzy, files, format)
-  ui/              code that runs inside pages, not in the main process
-    browser/       the browser UI: sidebar, tabs, address bar (index.html, renderer.js, styles.css, preload.js)
-    suggestions/   the address bar suggestion list
-    downloads/     the downloads panel under the toolbar's download button
-    settings/      the herdr://settings page
+  lib/             small shared functions with no Electron in them (url, keys, fuzzy, files, format,
+                   ui-build: where the built pages are)
+  ui/              code that runs inside pages, not in the main process (Svelte 5 + Tailwind CSS 4)
+    lib/           theme.css (Tailwind, colors, font, sizes; every page imports it), buttons.css
+    browser/       the browser UI: App.svelte with Sidebar, WorkspaceItem, TabStrip, TabItem, Toolbar,
+                   AddressBar, DownloadButton, NoticeBar, FindBar, RenameInput; preload.js
+    suggestions/   the address bar suggestion list (App, SuggestionRow, Highlighted; preload.js)
+    downloads/     the downloads panel under the toolbar's download button (App, DownloadRow, Icon; preload.js)
+    settings/      the herdr://settings page (App, DnsTab, ShortcutsTab, AboutTab)
     page-preload.js  runs in every web page
   testing/         helpers for tests only (fake Electron, DOM helpers); not shipped
+dist-ui/           the built pages (npm run build:ui); git-ignored, shipped in the app
 ```
 
 - `main.js` creates one shared `ctx` object and each service with `createX(ctx)`. Services reach
@@ -36,7 +40,28 @@ src/
   need Electron.
 - Tests sit next to the file they test, as `<name>.test.js`. Main-process tests drive the app
   through `src/testing/main-harness.js` and the fake Electron in `src/testing/fake-electron.js`;
-  UI tests run in jsdom.
+  UI tests mount the Svelte components in jsdom with `@testing-library/svelte` (e.g.
+  `src/ui/browser/App.test.js`); wrap actions in `flushSync` so the page updates before you check it.
+
+## The UI pages
+
+Each page in `src/ui/<page>/` (browser, suggestions, downloads, settings) has an `index.html`, a
+`main.js` that mounts `App.svelte`, its `app.css` (imports `../lib/theme.css`) and its components
+next to them. Write components with runes (`$state`, `$derived`, `$props`, `$effect`) and style
+them with Tailwind classes; the colors (`bg-panel`, `text-muted`, `border-border`, ...) and the
+sizes the main process lays views out by (`h-tabstrip`, `h-toolbar`, `h-notice`, `h-find`,
+`w-sidebar`) come from `@theme` in `src/ui/lib/theme.css`. Keep plain CSS for what classes can't
+say (base styles, the sleeping tab ring, window drag regions, keyframes). Don't use inline `style`
+attributes or `<style>` blocks: the pages' CSP has no `'unsafe-inline'` (`style:width={...}` is fine).
+
+- Vite (`vite.config.mjs`) builds the pages into `dist-ui/<page>/index.html`, with the files they
+  share in `dist-ui/assets/`. `npm start` builds them first; after changing a page, run
+  `npm run build:ui` (or `npm start`) to see it in the app.
+- The main process loads the built pages (`uiPage()` in `src/lib/ui-build.js`); `herdr://settings/`
+  serves `dist-ui/settings/` and `herdr://settings/assets/` serves `dist-ui/assets/`.
+- The preloads (`src/ui/**/preload.js`, `src/ui/page-preload.js`) are plain CommonJS files that
+  Vite doesn't build; the main process loads them from `src/ui/`. They give the pages
+  `window.herdr`, `window.suggestions`, `window.downloads` and `window.herdrSettings`.
 
 ## Checks
 
@@ -47,6 +72,7 @@ npm run lint            # eslint, including a cyclomatic complexity limit of 12 
 npm run format:check    # prettier (npm run format fixes it)
 npm run knip            # no unused files, exports or dependencies
 npm run test:coverage   # vitest; fails if coverage of src/ drops below 80%
+npm run build:ui        # vite build of the pages into dist-ui/
 ```
 
 ## CHANGELOG.md

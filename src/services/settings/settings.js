@@ -1,5 +1,5 @@
 // User settings (settings.json in the profile) and applying them. The settings page itself is
-// served from src/ui/settings/ as herdr://settings (see protocol.js).
+// built from src/ui/settings/ and served as herdr://settings (see protocol.js).
 const fs = require('fs');
 
 // DNS-over-HTTPS servers. Lookups through them are encrypted, so the network can't read or

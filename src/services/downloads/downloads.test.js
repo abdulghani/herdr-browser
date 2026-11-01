@@ -75,7 +75,7 @@ describe('downloads', () => {
     m.download({ filename: 'a.zip' });
     expect(uiSent('show-downloads')).toHaveLength(1);
     m.cmd('showDownloads', rect); // the UI answers with where its button is
-    expect(panel().webContents.loadFile).toHaveBeenCalledWith(expect.stringMatching(/ui[/\\]downloads[/\\]index\.html$/));
+    expect(panel().webContents.loadFile).toHaveBeenCalledWith(expect.stringMatching(/dist-ui[/\\]downloads[/\\]index\.html$/));
     expect(panel().background).toBe('#00000000');
     expect(panel().bounds).toEqual({ x: 1328 - 360, y: 75, width: 360, height: 40 + 52 + 10 });
     expect(m.win().children.at(-1)).toBe(panel());

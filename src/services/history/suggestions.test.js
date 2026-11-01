@@ -13,7 +13,7 @@ describe('address bar suggestions', () => {
     m.cmd('newTab'); // the page view is shown first, the list goes on top of it
     m.cmd('showSuggestions', { rows: [{ url: 'a' }, { url: 'b' }], selected: 0, rect });
     const overlay = m.views.find((v) => v.options.webPreferences.preload.endsWith(path.join('ui', 'suggestions', 'preload.js')));
-    expect(overlay.webContents.loadFile).toHaveBeenCalledWith(expect.stringMatching(/ui[/\\]suggestions[/\\]index\.html$/));
+    expect(overlay.webContents.loadFile).toHaveBeenCalledWith(expect.stringMatching(/dist-ui[/\\]suggestions[/\\]index\.html$/));
     expect(overlay.background).toBe('#00000000');
     expect(overlay.bounds).toEqual({ x: 300, y: 71, width: 600, height: 2 * 32 + 10 });
     expect(m.win().children.at(-1)).toBe(overlay);

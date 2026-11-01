@@ -1,0 +1,45 @@
+/* Shared by every page (browser UI, suggestions, downloads, settings): Tailwind, the colors and
+   font, and sizes the main process must agree with. Each page's app.css imports this. */
+@import 'tailwindcss';
+
+@theme {
+  /* Only these colors, so every page uses the same palette. */
+  --color-*: initial;
+  --color-bg: #0b0d10; /* BLANK_BG and the window background in the main process */
+  --color-panel: #12151a;
+  --color-panel-2: #1a1e25;
+  --color-border: #252a33;
+  --color-fg: #c9d1d9;
+  --color-muted: #6e7681;
+  --color-accent: #58a6ff;
+  --color-accent-fg: #0b0d10;
+  --color-notice: #1c2433;
+  --color-error: #f85149;
+  --color-ok: #3fb950;
+
+  --font-mono: 'JetBrainsMono Nerd Font', 'JetBrains Mono', ui-monospace, monospace;
+  --default-font-family: var(--font-mono);
+
+  /* Sizes the main process lays the page views out by (src/services/tab-views/tab-views.js). */
+  --spacing-sidebar: 220px; /* SIDEBAR_WIDTH */
+  --spacing-sidebar-collapsed: 52px; /* SIDEBAR_COLLAPSED_WIDTH */
+  --spacing-tabstrip: 36px; /* tabstrip + toolbar = CHROME_HEIGHT */
+  --spacing-toolbar: 40px;
+  --spacing-notice: 36px; /* NOTICE_HEIGHT */
+  --spacing-find: 36px; /* FIND_HEIGHT */
+}
+
+@layer base {
+  /* Browser defaults rather than Tailwind's: normal line height and the built-in placeholder color. */
+  html {
+    line-height: normal;
+  }
+  ::placeholder {
+    color: revert;
+    opacity: revert;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+}

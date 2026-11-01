@@ -46,7 +46,7 @@ describe('startup', () => {
     expect(m.win().setTitle).toHaveBeenLastCalledWith('New Tab — main');
     expect(state()).toMatchObject({ prefixArmed: false, find: null, nav: { canGoBack: false, canGoForward: false, loading: false } });
     expect(m.electron.Menu.setApplicationMenu).toHaveBeenCalledWith(null);
-    expect(m.win().loadFile).toHaveBeenCalledWith(expect.stringMatching(/ui[/\\]browser[/\\]index\.html$/));
+    expect(m.win().loadFile).toHaveBeenCalledWith(expect.stringMatching(/dist-ui[/\\]browser[/\\]index\.html$/));
     expect(m.win().options.titleBarStyle).toBeUndefined();
   });
 

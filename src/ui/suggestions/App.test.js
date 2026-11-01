@@ -1,26 +1,35 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadBody } from '../../testing/dom.js';
+import { cleanup, render } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import App from './App.svelte';
 
 let api;
 let showRows;
 let select;
 
-beforeEach(async () => {
-  loadBody('src/ui/suggestions/index.html');
+beforeEach(() => {
   api = {
-    onRows: vi.fn((fn) => (showRows = fn)),
-    onSelect: vi.fn((fn) => (select = fn)),
+    onRows: vi.fn((fn) => (showRows = (payload) => flushSync(() => fn(payload)))),
+    onSelect: vi.fn((fn) => (select = (i) => flushSync(() => fn(i)))),
     hover: vi.fn(),
     pick: vi.fn(),
   };
   window.suggestions = api;
-  vi.resetModules();
-  await import('./suggest.js');
+  render(App);
 });
 
+afterEach(cleanup);
+
 const items = () => [...document.querySelectorAll('#suggestions li')];
-const move = (item, x, y) => item.dispatchEvent(new MouseEvent('mousemove', { screenX: x, screenY: y, bubbles: true }));
+const isSelected = (item) => item.classList.contains('selected');
+const move = (item, x, y) => flushSync(() => item.dispatchEvent(new MouseEvent('mousemove', { screenX: x, screenY: y, bubbles: true })));
+// The text of a highlighted line, with the bold runs in [brackets].
+const marked = (node) =>
+  [...node.childNodes]
+    .filter((n) => n.nodeType !== Node.COMMENT_NODE)
+    .map((n) => (n.nodeName === 'B' ? `[${n.textContent}]` : n.textContent))
+    .join('');
 
 const historyRow = {
   kind: 'history',
@@ -44,11 +53,12 @@ describe('suggestions overlay', () => {
     });
     const [url, search, local, scheme] = items();
     expect(url.querySelector('.sg-icon').textContent).toBe('↗');
+    expect(url.querySelector('.sg-title').textContent).toBe('example.com');
     expect(url.querySelector('.sg-detail').textContent).toBe('open');
     expect(search.querySelector('.sg-icon').textContent).toBe('⌕');
     expect(search.querySelector('.sg-detail').textContent).toBe('search Google');
-    expect(search.classList.contains('selected')).toBe(true);
-    expect(url.classList.contains('selected')).toBe(false);
+    expect(isSelected(search)).toBe(true);
+    expect(isSelected(url)).toBe(false);
     expect(local.querySelector('.sg-detail').textContent).toBe('open');
     expect(scheme.querySelector('.sg-detail').textContent).toBe('open');
   });
@@ -59,14 +69,13 @@ describe('suggestions overlay', () => {
       selected: 0,
     });
     const [page, tab] = items();
-    const title = page.querySelector('.sg-title');
-    expect(title.innerHTML).toBe('<b>Gi</b>tHub');
-    expect(page.querySelector('.sg-url').innerHTML).toBe('git<b>hub</b>.com');
+    expect(marked(page.querySelector('.sg-title'))).toBe('[Gi]tHub');
+    expect(marked(page.querySelector('.sg-url'))).toBe('git[hub].com');
     expect(page.querySelector('img').getAttribute('src')).toBe(historyRow.favicon);
     expect(page.querySelector('.sg-detail').textContent).toBe('');
 
     // No title: the URL is the title, and there's no separate URL line.
-    expect(tab.querySelector('.sg-title').innerHTML).toBe('<b>e</b>xample.com');
+    expect(marked(tab.querySelector('.sg-title'))).toBe('[e]xample.com');
     expect(tab.querySelector('.sg-url')).toBeNull();
     expect(tab.querySelector('.favicon-blank')).not.toBeNull();
     expect(tab.querySelector('.sg-detail').textContent).toBe('switch to tab');
@@ -74,7 +83,7 @@ describe('suggestions overlay', () => {
 
   it('swaps a broken favicon for a blank one', () => {
     showRows({ rows: [historyRow], selected: 0 });
-    items()[0].querySelector('img').dispatchEvent(new Event('error'));
+    flushSync(() => items()[0].querySelector('img').dispatchEvent(new Event('error')));
     expect(items()[0].querySelector('img')).toBeNull();
     expect(items()[0].querySelector('.favicon-blank')).not.toBeNull();
   });
@@ -82,7 +91,7 @@ describe('suggestions overlay', () => {
   it('moves the highlight on select', () => {
     showRows({ rows: [historyRow, historyRow, historyRow], selected: 0 });
     select(2);
-    expect(items().map((i) => i.classList.contains('selected'))).toEqual([false, false, true]);
+    expect(items().map(isSelected)).toEqual([false, false, true]);
   });
 
   it('only follows the mouse once it really moves', () => {
@@ -96,13 +105,13 @@ describe('suggestions overlay', () => {
     expect(api.hover).not.toHaveBeenCalled();
     move(second, 12, 10);
     expect(api.hover).toHaveBeenCalledWith(1);
-    expect(second.classList.contains('selected')).toBe(true);
-    expect(first.classList.contains('selected')).toBe(false);
+    expect(isSelected(second)).toBe(true);
+    expect(isSelected(first)).toBe(false);
   });
 
   it('picks a row on mouse press', () => {
     showRows({ rows: [historyRow, historyRow], selected: 0 });
-    const press = new MouseEvent('mousedown', { cancelable: true });
+    const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
     items()[1].dispatchEvent(press);
     expect(api.pick).toHaveBeenCalledWith(1);
     expect(press.defaultPrevented).toBe(true);

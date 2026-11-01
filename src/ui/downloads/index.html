@@ -3,19 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'" />
-    <link rel="stylesheet" href="../browser/styles.css" />
-    <link rel="stylesheet" href="downloads.css" />
   </head>
   <!-- The downloads panel, drawn in its own view on top of the page (see src/services/downloads/downloads.js). -->
-  <body class="downloads-overlay">
-    <section class="dl-panel">
-      <header class="dl-header">
-        <span class="dl-heading">Downloads</span>
-        <button id="dl-folder" title="Open the Downloads folder">Open folder</button>
-        <button id="dl-clear" title="Remove finished downloads from the list (the files stay)">Clear</button>
-      </header>
-      <ol id="dl-list"></ol>
-    </section>
-    <script src="downloads.js"></script>
+  <body>
+    <script type="module" src="./main.js"></script>
   </body>
 </html>

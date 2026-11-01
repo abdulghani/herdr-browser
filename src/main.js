@@ -6,6 +6,7 @@ const { app, BrowserWindow, Menu, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { normalizeUrl } = require('./lib/url');
+const { uiPage } = require('./lib/ui-build');
 const { createWorkspaces } = require('./services/workspaces/workspaces');
 const { createSession } = require('./services/workspaces/session');
 const { createClosedTabs } = require('./services/workspaces/closed-tabs');
@@ -69,7 +70,7 @@ function createWindow() {
   });
   ctx.win = win;
   Menu.setApplicationMenu(null);
-  win.loadFile(path.join(__dirname, 'ui', 'browser', 'index.html'));
+  win.loadFile(uiPage('browser'));
   win.webContents.on('before-input-event', (event, input) => ctx.keyboard.handleKey(event, input, win.webContents));
   win.on('resize', () => ctx.views.layout());
   win.on('blur', () => {
