@@ -19,7 +19,10 @@ const tabLabel = (tab) => tab.customName || tab.title || tab.url;
 
 // "claims migration" -> "CM", "research" -> "RE"
 function initials(name) {
-  const words = name.trim().split(/[\s_-]+/).filter(Boolean);
+  const words = name
+    .trim()
+    .split(/[\s_-]+/)
+    .filter(Boolean);
   if (!words.length) return '?';
   const letters = words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2);
   return letters.toUpperCase();
@@ -55,9 +58,7 @@ function renderWorkspaces() {
     ...state.workspaces.map((ws, i) => {
       const item = el('li', { className: `ws${i === state.activeWs ? ' active' : ''}`, draggable: true }, [
         el('span', { className: 'ws-num', textContent: i + 1 }),
-        el('span', { className: 'ws-icon', textContent: initials(ws.name) }, [
-          el('span', { className: 'ws-badge', textContent: i + 1 }),
-        ]),
+        el('span', { className: 'ws-icon', textContent: initials(ws.name) }, [el('span', { className: 'ws-badge', textContent: i + 1 })]),
         el('span', { className: 'ws-name', textContent: ws.name }),
         el('span', { className: 'ws-count', textContent: ws.tabs.length }),
         closeButton(() => cmd('closeWorkspace', ws.id)),
@@ -66,7 +67,7 @@ function renderWorkspaces() {
       item.onclick = () => cmd('selectWorkspace', ws.id);
       item.ondblclick = () => requestRename('workspace', ws.id);
       item.title = `${ws.name} (${ws.tabs.length} tabs)\n${ws.tabs.map((t) => `  ${tabLabel(t)}`).join('\n')}`;
-      wireDrag(item, 'ws', ws.id, (e) => {
+      wireDrag(item, 'ws', ws.id, () => {
         // Tabs dropped on a workspace move into it; workspaces dropped on one reorder.
         if (drag.kind === 'tab') cmd('moveTabTo', { tabId: drag.id, wsId: ws.id });
         else cmd('moveWorkspaceTo', { wsId: drag.id, index: i });
@@ -85,12 +86,20 @@ function renderTabs() {
       const icon = tab.favicon
         ? el('img', { src: tab.favicon, onerror: (e) => e.target.replaceWith(el('span', { className: 'favicon-blank' })) })
         : el('span', { className: 'favicon-blank' });
-      const item = el('li', { className: `tab${i === ws.activeTab ? ' active' : ''}${state.awake.includes(tab.id) ? '' : ' asleep'}`, draggable: true, title: `${tabLabel(tab)}\n${tab.url}` }, [
-        el('span', { className: 'tab-num', textContent: i + 1 }),
-        icon,
-        el('span', { className: 'tab-title', textContent: tabLabel(tab) }),
-        closeButton(() => cmd('closeTab', tab.id)),
-      ]);
+      const item = el(
+        'li',
+        {
+          className: `tab${i === ws.activeTab ? ' active' : ''}${state.awake.includes(tab.id) ? '' : ' asleep'}`,
+          draggable: true,
+          title: `${tabLabel(tab)}\n${tab.url}`,
+        },
+        [
+          el('span', { className: 'tab-num', textContent: i + 1 }),
+          icon,
+          el('span', { className: 'tab-title', textContent: tabLabel(tab) }),
+          closeButton(() => cmd('closeTab', tab.id)),
+        ],
+      );
       item.dataset.id = tab.id;
       item.onclick = () => cmd('selectTab', tab.id);
       item.onauxclick = (e) => e.button === 1 && cmd('closeTab', tab.id);
@@ -200,7 +209,9 @@ function wireDrag(item, kind, id, onDrop) {
   };
   item.ondragend = () => {
     drag = null;
-    document.querySelectorAll('.dragging, .drop-before, .drop-into').forEach((n) => n.classList.remove('dragging', 'drop-before', 'drop-into'));
+    document
+      .querySelectorAll('.dragging, .drop-before, .drop-into')
+      .forEach((n) => n.classList.remove('dragging', 'drop-before', 'drop-into'));
   };
   item.ondragover = (e) => {
     if (!drag || drag.id === id) return;
@@ -228,7 +239,7 @@ $('collapse').onclick = () => cmd('toggleSidebar');
 $('notice-open').onclick = () => cmd('openExternally');
 $('notice-dismiss').onclick = () => cmd('dismissNotice');
 $('help-toggle').onclick = () => ($('help').hidden = !$('help').hidden);
-$('tabstrip').ondblclick = (e) => e.target.id === 'tabs' || e.target.id === 'tabstrip' ? cmd('newTab') : null;
+$('tabstrip').ondblclick = (e) => (e.target.id === 'tabs' || e.target.id === 'tabstrip' ? cmd('newTab') : null);
 
 $('address-form').onsubmit = (e) => {
   e.preventDefault();

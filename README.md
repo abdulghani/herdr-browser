@@ -46,6 +46,9 @@ On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses th
 ```sh
 npm install
 npm start               # run from source
+npm test                # unit tests (vitest)
+npm run lint            # eslint
+npm run format          # prettier (npm run format:check only checks)
 npm run dist            # build dist/HerdrBrowser-<version>-x86_64.AppImage
 scripts/install-linux.sh   # install the newest build from dist/
 ```
@@ -76,17 +79,17 @@ To release by hand, open the Actions tab, pick "Release" and click "Run workflow
 
 Mirrors the herdr config: `Ctrl+Space` is the prefix.
 
-| Action | herdr-style | Browser-style |
-|---|---|---|
-| New / close / rename tab | prefix `c` / `k` / `r` | `Ctrl+T` / `Ctrl+W` |
-| New / close / rename workspace | prefix `C` / `K` / `R` | `Ctrl+Shift+T` |
-| Next / previous tab | `Alt+←/→`, prefix `n` / `p` | `Ctrl+Tab` |
-| Next / previous workspace | `Alt+↑/↓`, prefix `N` / `P` | `Ctrl+1-9` jumps |
-| Jump to tab | `Alt+1-9`, prefix `1-9` | |
-| Move tab / workspace | `Alt+Shift+arrows` | |
-| Collapse sidebar | prefix `b` | `Ctrl+B` |
-| Address bar / back / forward | | `Ctrl+L` / `Ctrl+[` / `Ctrl+]` |
-| Settings | | `Ctrl+,` (`Cmd+,` on macOS) |
+| Action                         | herdr-style                 | Browser-style                  |
+| ------------------------------ | --------------------------- | ------------------------------ |
+| New / close / rename tab       | prefix `c` / `k` / `r`      | `Ctrl+T` / `Ctrl+W`            |
+| New / close / rename workspace | prefix `C` / `K` / `R`      | `Ctrl+Shift+T`                 |
+| Next / previous tab            | `Alt+←/→`, prefix `n` / `p` | `Ctrl+Tab`                     |
+| Next / previous workspace      | `Alt+↑/↓`, prefix `N` / `P` | `Ctrl+1-9` jumps               |
+| Jump to tab                    | `Alt+1-9`, prefix `1-9`     |                                |
+| Move tab / workspace           | `Alt+Shift+arrows`          |                                |
+| Collapse sidebar               | prefix `b`                  | `Ctrl+B`                       |
+| Address bar / back / forward   |                             | `Ctrl+L` / `Ctrl+[` / `Ctrl+]` |
+| Settings                       |                             | `Ctrl+,` (`Cmd+,` on macOS)    |
 
 While typing in a text box, `Alt+arrows` (Option on a Mac) move the cursor by word or line as usual,
 and `Alt+Shift+arrows` select text, instead of switching or moving tabs.

@@ -6,12 +6,22 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "dist": "electron-builder --linux AppImage",
     "dist:mac": "electron-builder --mac dmg --arm64 --x64"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "^45.1.0",
-    "electron-builder": "^26.18.0"
+    "electron-builder": "^26.18.0",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10",
+    "vitest": "^5.0.5"
   },
   "desktopName": "herdr-browser.desktop",
   "build": {
