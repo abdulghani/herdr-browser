@@ -88,6 +88,7 @@ Merging a pull request that changes `src/` or `CHANGELOG.md` makes a new release
 `CHANGELOG.md`, and the Mac dmgs and the Linux AppImage are built and attached to a GitHub release.
 The version goes up by a patch (0.3.0 → 0.3.1) unless the pull request has the label
 `release:minor` (→ 0.4.0) or `release:major` (→ 1.0.0). Label it `skip-release` to not release.
+Lines written under `## Unreleased` in `CHANGELOG.md` go into the next release's notes.
 To release by hand, open the Actions tab, pick "Release" and click "Run workflow". Either way,
 nothing is released unless `src/` or `CHANGELOG.md` changed since the last release.
 

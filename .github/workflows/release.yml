@@ -103,15 +103,30 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
             -f tag_name="$TAG" -f target_commitish=main -f previous_tag_name="$PREVIOUS" \
             --jq .body > notes.md
+          # Notes written by hand under "## Unreleased" go into this release, above GitHub's list
+          # of merged pull requests, and the Unreleased section starts over empty.
+          touch CHANGELOG.md
+          unreleased="$(awk '/^## Unreleased/ { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md | sed '/./,$!d')"
+          older="$(awk '/^# Changelog/ { next } /^## Unreleased/ { skip = 1; next } /^## / { skip = 0 } !skip' CHANGELOG.md | sed '/./,$!d')"
+          {
+            if [ -n "$unreleased" ]; then
+              echo "$unreleased"
+              echo
+            fi
+            # GitHub's notes start with a "What's Changed" heading; the version heading replaces it.
+            grep -v "^## What's Changed" notes.md
+          } > release-notes.md
+          mv release-notes.md notes.md
           {
             echo "# Changelog"
             echo
+            echo "## Unreleased"
+            echo
             echo "## $TAG ($(date -u +%Y-%m-%d))"
             echo
-            # GitHub's notes start with a "What's Changed" heading; the version heading replaces it.
-            grep -v "^## What's Changed" notes.md
+            cat notes.md
             echo
-            [ -f CHANGELOG.md ] && tail -n +3 CHANGELOG.md
+            [ -n "$older" ] && echo "$older"
           } > CHANGELOG.new
           mv CHANGELOG.new CHANGELOG.md
 
