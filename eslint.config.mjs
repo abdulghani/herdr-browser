@@ -5,28 +5,29 @@ import prettier from 'eslint-config-prettier';
 export default [
   { ignores: ['dist/', 'node_modules/', 'coverage/'] },
   js.configs.recommended,
-  // Main process and its modules.
+  // Main process: the entry point, its services and shared functions.
   {
-    files: ['src/*.js'],
+    files: ['src/*.js', 'src/services/**/*.js', 'src/lib/**/*.js'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
   },
   // Preloads run in the page with Node's require.
   {
-    files: ['src/*preload.js'],
-    languageOptions: { globals: { ...globals.browser } },
+    files: ['src/ui/**/preload.js', 'src/ui/page-preload.js'],
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
   },
   // The browser UI, suggestions overlay and settings page are plain browser scripts.
   {
-    files: ['src/ui/*.js', 'src/settings/*.js'],
+    files: ['src/ui/browser/renderer.js', 'src/ui/suggestions/suggest.js', 'src/ui/settings/settings.js'],
     languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
   },
+  // Tests (next to the files they test), their helpers and the config files are ES modules.
   {
-    files: ['test/**/*.js', '*.config.{js,mjs}'],
+    files: ['src/**/*.test.js', 'src/testing/**/*.js', '*.config.{js,mjs}'],
     languageOptions: { sourceType: 'module', globals: { ...globals.node } },
   },
-  // Tests of the UI scripts run in jsdom, which provides the browser globals.
+  // Tests of the UI scripts and preloads run in jsdom, which provides the browser globals.
   {
-    files: ['test/ui-*.test.js', 'test/settings-page.test.js', 'test/preloads.test.js', 'test/helpers/dom.js'],
+    files: ['src/ui/**/*.test.js', 'src/testing/dom.js'],
     languageOptions: { globals: { ...globals.browser } },
   },
   {

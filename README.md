@@ -61,6 +61,26 @@ The AppImage needs FUSE 2 (`sudo pacman -S fuse2` on Arch), or run it with
 Set `HERDR_BROWSER_PROFILE=/some/dir` to run with a separate profile, e.g. alongside your
 everyday instance while developing.
 
+## Project layout
+
+Tests sit next to the file they test, as `<name>.test.js`.
+
+- `src/main.js`: starts the app, opens the window and connects the services
+- `src/ipc.js`: the commands the browser UI sends to the main process
+- `src/services/`: what the browser does, one folder each:
+  - `workspaces/`: workspaces and tabs, saving the session, reopening closed tabs
+  - `tab-views/`: the page shown in each tab, its size and place, sleeping tabs
+  - `history/`: browsing history and the address bar suggestions
+  - `settings/`: settings, DNS, and the `herdr://settings` page
+  - `find/`: find in page
+  - `keyboard/`: keyboard shortcuts
+  - `passkeys/`: the passkey notice and opening a page in another browser
+  - `context-menu/`: the right-click menu
+- `src/lib/`: small shared functions (URLs, key names, fuzzy matching)
+- `src/ui/`: the pages: `browser/` (sidebar, tabs, address bar), `suggestions/` (the suggestion
+  list), `settings/` (the settings page), and `page-preload.js` (runs in every web page)
+- `src/testing/`: helpers for the tests (not part of the app)
+
 ## Releases
 
 Merging a pull request that changes `src/` or `CHANGELOG.md` makes a new release on its own

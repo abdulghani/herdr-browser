@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self'" />
+    <link rel="stylesheet" href="../browser/styles.css" />
+  </head>
+  <!-- Address bar suggestions, drawn in their own view on top of the page (see src/services/history/suggestions.js). -->
+  <body class="suggest-overlay">
+    <ol id="suggestions"></ol>
+    <script src="suggest.js"></script>
+  </body>
+</html>

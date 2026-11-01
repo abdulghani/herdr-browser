@@ -1,5 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/*preload.js", "src/ui/*.js", "src/settings/*.js"],
-  "project": ["src/**/*.js", "test/**/*.js"]
+  "entry": [
+    "src/ui/**/preload.js",
+    "src/ui/page-preload.js",
+    "src/ui/browser/renderer.js",
+    "src/ui/suggestions/suggest.js",
+    "src/ui/settings/settings.js"
+  ],
+  "project": ["src/**/*.js"]
 }
