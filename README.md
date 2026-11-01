@@ -46,6 +46,8 @@ On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses th
 
 ## Run / build
 
+Needs Node.js 26, the current LTS (`.nvmrc`; with nvm, run `nvm use`). CI uses the same version.
+
 ```sh
 npm install
 npm start               # build the UI (into dist-ui/) and run from source
