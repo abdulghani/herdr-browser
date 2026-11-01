@@ -670,59 +670,58 @@ function setPrefix(armed) {
 // webContents ids whose focused element is a text field.
 const textFocus = new Set();
 
+const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'];
+// Option+arrow, with or without Shift.
+const WORD_MOVE = /^alt\+(shift\+)?(left|right|up|down)$/;
+
 function handleKey(event, input, wc) {
-  if (input.type !== 'keyDown') return;
-  if (['Control', 'Shift', 'Alt', 'Meta'].includes(input.key)) return;
+  if (input.type !== 'keyDown' || MODIFIER_KEYS.includes(input.key)) return;
   const chord = chordOf(input);
-  // In a text field, Option+arrow (with or without Shift) moves or selects by word, like Chrome.
-  if (!prefixArmed && textFocus.has(wc.id) && /^alt\+(shift\+)?(left|right|up|down)$/.test(chord)) return;
 
   if (prefixArmed) {
     event.preventDefault();
     setPrefix(false);
-    if (PREFIX_ACTIONS[chord]) return PREFIX_ACTIONS[chord]();
-    const digit = chord.match(/^(\d)$/);
-    if (digit) return selectTab(Number(digit[1]) - 1);
-    const shiftDigit = input.code.match(/^Digit(\d)$/);
-    if (shiftDigit && input.shift) selectWorkspace(Number(shiftDigit[1]) - 1);
-    return;
+    return handlePrefixKey(chord, input);
   }
-
+  // In a text field, Option+arrow (with or without Shift) moves or selects by word, like Chrome.
+  if (textFocus.has(wc.id) && WORD_MOVE.test(chord)) return;
   if (chord === 'ctrl+space') {
     event.preventDefault();
-    setPrefix(true);
-    return;
+    return setPrefix(true);
   }
 
-  const altDigit = chord.match(/^alt\+(\d)$/);
-  if (altDigit) {
-    event.preventDefault();
-    return selectTab(Number(altDigit[1]) - 1);
-  }
-  // Like other Mac browsers: Cmd+1-8 jumps to that tab, Cmd+9 to the last one.
-  const cmdDigit = chord.match(/^cmd\+([1-9])$/);
-  if (cmdDigit) {
-    event.preventDefault();
-    const n = Number(cmdDigit[1]);
-    return selectTab(n === 9 ? activeWs().tabs.length - 1 : n - 1);
-  }
-  const ctrlDigit = chord.match(/^ctrl\+([1-9])$/);
-  if (ctrlDigit) {
-    event.preventDefault();
-    return selectWorkspace(Number(ctrlDigit[1]) - 1);
-  }
-
-  // Escape closes the find bar, wherever the focus is.
-  if (chord === 'escape' && finds.has(activeTab().id)) {
-    event.preventDefault();
-    return closeFind();
-  }
-
-  const action = DIRECT_ACTIONS[chord];
+  const action = digitAction(chord) || directAction(chord);
   if (action) {
     event.preventDefault();
     action();
   }
+}
+
+// The key pressed after the Ctrl+Space prefix.
+function handlePrefixKey(chord, input) {
+  if (PREFIX_ACTIONS[chord]) return PREFIX_ACTIONS[chord]();
+  const digit = chord.match(/^(\d)$/);
+  if (digit) return selectTab(Number(digit[1]) - 1);
+  const shiftDigit = input.code.match(/^Digit(\d)$/);
+  if (shiftDigit && input.shift) selectWorkspace(Number(shiftDigit[1]) - 1);
+}
+
+// Alt+digit jumps to that tab, and so does Cmd+1-8 with Cmd+9 the last tab, like other Mac
+// browsers. Ctrl+1-9 jumps to that workspace.
+function digitAction(chord) {
+  const [, modifier, digit] = chord.match(/^(alt|cmd|ctrl)\+(\d)$/) || [];
+  if (!modifier) return null;
+  const n = Number(digit);
+  if (modifier === 'alt') return () => selectTab(n - 1);
+  if (n === 0) return null; // Ctrl+0 resets the zoom (DIRECT_ACTIONS)
+  if (modifier === 'cmd') return () => selectTab(n === 9 ? activeWs().tabs.length - 1 : n - 1);
+  return () => selectWorkspace(n - 1);
+}
+
+function directAction(chord) {
+  // Escape closes the find bar, wherever the focus is.
+  if (chord === 'escape') return finds.has(activeTab().id) ? closeFind : null;
+  return DIRECT_ACTIONS[chord];
 }
 
 // ---------- IPC from the chrome UI ----------

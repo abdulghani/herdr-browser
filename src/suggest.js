@@ -18,32 +18,37 @@ const displayUrl = (url) =>
 // short token doesn't match every long URL.
 function fuzzyMatch(token, text) {
   const lower = text.toLowerCase();
-  // A plain substring match beats any scattered one.
+  return substringMatch(token, lower) || scatteredMatch(token, lower);
+}
+
+const isWordStart = (lower, i) => i === 0 || !/[a-z0-9]/.test(lower[i - 1]);
+
+// A plain substring match beats any scattered one.
+function substringMatch(token, lower) {
   const at = lower.indexOf(token);
-  if (at !== -1) {
-    const wordStart = at === 0 || !/[a-z0-9]/.test(lower[at - 1]);
-    return {
-      score: token.length * 4 + (at === 0 ? 10 : wordStart ? 5 : 0),
-      positions: Array.from({ length: token.length }, (_, i) => at + i),
-    };
-  }
+  if (at === -1) return null;
+  return {
+    score: token.length * 4 + (at === 0 ? 10 : isWordStart(lower, at) ? 5 : 0),
+    positions: Array.from({ length: token.length }, (_, i) => at + i),
+  };
+}
+
+function scatteredMatch(token, lower) {
   const positions = [];
   let score = 0;
   let breaks = 0;
-  let from = 0;
   for (const ch of token) {
-    const i = lower.indexOf(ch, from);
+    const prev = positions.at(-1);
+    const i = lower.indexOf(ch, prev === undefined ? 0 : prev + 1);
     if (i === -1) return null;
-    const prev = positions[positions.length - 1];
-    if (prev !== undefined && i !== prev + 1) breaks++;
-    score += 1 + (prev !== undefined && i === prev + 1 ? 2 : 0) + (i === 0 || !/[a-z0-9]/.test(lower[i - 1]) ? 3 : 0);
+    const adjacent = i === prev + 1;
+    if (prev !== undefined && !adjacent) breaks++;
+    score += 1 + (adjacent ? 2 : 0) + (isWordStart(lower, i) ? 3 : 0);
     positions.push(i);
-    from = i + 1;
   }
   // Scattered letters only count when the first one starts a word ("ytb" -> youtube).
-  const firstAtWordStart = positions[0] === 0 || !/[a-z0-9]/.test(lower[positions[0] - 1]);
-  if (breaks > (firstAtWordStart ? Math.max(2, Math.ceil(token.length / 2)) : 1)) return null;
-  return { score, positions };
+  const maxBreaks = isWordStart(lower, positions[0]) ? Math.max(2, Math.ceil(token.length / 2)) : 1;
+  return breaks > maxBreaks ? null : { score, positions };
 }
 
 // Every token must match the title or the URL; positions are kept per field for highlighting.

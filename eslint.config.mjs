@@ -28,6 +28,8 @@ export default [
     rules: {
       // `catch {}` is used on purpose where a failure just means "use the default".
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // Keep functions small enough to follow: at most 12 paths through each one.
+      complexity: ['error', 12],
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true }],
     },
   },
