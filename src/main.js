@@ -180,7 +180,8 @@ function createView(tab) {
   });
   wc.on('did-start-loading', () => broadcast());
   wc.on('did-stop-loading', () => broadcast());
-  wc.on('before-input-event', (event, input) => handleKey(event, input));
+  wc.on('before-input-event', (event, input) => handleKey(event, input, wc));
+  wc.on('did-start-navigation', (details) => details.isMainFrame && !details.isSameDocument && textFocus.delete(wc.id));
   wc.on('focus', closeSuggestions);
   wc.setWindowOpenHandler(({ url }) => {
     // Popups and target=_blank open as a new tab in the same workspace.
@@ -672,10 +673,15 @@ function setPrefix(armed) {
   broadcast();
 }
 
-function handleKey(event, input) {
+// webContents ids whose focused element is a text field.
+const textFocus = new Set();
+
+function handleKey(event, input, wc) {
   if (input.type !== 'keyDown') return;
   if (['Control', 'Shift', 'Alt', 'Meta'].includes(input.key)) return;
   const chord = chordOf(input);
+  // In a text field, Option+arrow (with or without Shift) moves or selects by word, like Chrome.
+  if (!prefixArmed && textFocus.has(wc.id) && /^alt\+(shift\+)?(left|right|up|down)$/.test(chord)) return;
 
   if (prefixArmed) {
     event.preventDefault();
@@ -820,6 +826,7 @@ ipcMain.on('passkey-request', (e) => {
   if (entry) setNotice(entry[0], { kind: 'passkey', browser: externalBrowser()?.name ?? null });
 });
 ipcMain.on('ready', () => broadcast());
+ipcMain.on('text-focus', (e, typing) => (typing ? textFocus.add(e.sender.id) : textFocus.delete(e.sender.id)));
 ipcMain.handle('suggest', (_e, query) => {
   const current = activeTab().id;
   const openTabs = state.workspaces.flatMap((ws) =>
@@ -845,7 +852,7 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  win.webContents.on('before-input-event', (event, input) => handleKey(event, input));
+  win.webContents.on('before-input-event', (event, input) => handleKey(event, input, win.webContents));
   win.on('resize', layoutView);
   win.on('blur', closeSuggestions);
   win.on('close', () => {
