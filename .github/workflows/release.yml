@@ -1,6 +1,7 @@
-# When a pull request that changes the app's source is merged into main, bump the version,
-# add the merged pull requests to CHANGELOG.md, build the Mac and Linux apps and publish them
-# as a GitHub release.
+# When a pull request that changes the app's source (src/) or CHANGELOG.md is merged into main,
+# bump the version, add the merged pull requests to CHANGELOG.md, build the Mac and Linux apps
+# and publish them as a GitHub release. Nothing is released unless src/ or CHANGELOG.md changed
+# since the last release, also when run by hand.
 #
 # The version goes up by a patch (0.3.0 -> 0.3.1) unless the pull request has one of these labels:
 #   release:minor   0.3.0 -> 0.4.0
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'CHANGELOG.md'
   workflow_dispatch:
     inputs:
       bump:
@@ -33,8 +35,33 @@ permissions:
   contents: write
 
 jobs:
-  bump:
+  # Is there anything to release since the last release?
+  changes:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'skip-release')
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.diff.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compare with the last release
+        id: diff
+        run: |
+          previous="$(git describe --tags --abbrev=0 --match 'v*')"
+          if git diff --quiet "$previous" HEAD -- src CHANGELOG.md; then
+            echo "::notice::Nothing in src/ or CHANGELOG.md changed since $previous, so there's nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat "$previous" HEAD -- src CHANGELOG.md
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  bump:
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
