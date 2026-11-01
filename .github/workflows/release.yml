@@ -6,6 +6,8 @@
 #   release:minor   0.3.0 -> 0.4.0
 #   release:major   0.3.0 -> 1.0.0
 #   skip-release    no release at all
+#
+# It can also be run by hand from the Actions tab ("Run workflow"), picking the bump there.
 name: Release
 
 on:
@@ -14,6 +16,13 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 # One release at a time, in the order the pull requests were merged.
 concurrency:
@@ -25,7 +34,7 @@ permissions:
 
 jobs:
   bump:
-    if: github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'skip-release')
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'skip-release')
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
@@ -43,8 +52,9 @@ jobs:
         id: version
         env:
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          BUMP: ${{ inputs.bump }}
         run: |
-          bump="patch"
+          bump="${BUMP:-patch}"
           if echo "$LABELS" | grep -q '"release:major"'; then bump="major"
           elif echo "$LABELS" | grep -q '"release:minor"'; then bump="minor"
           fi
