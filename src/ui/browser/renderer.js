@@ -123,6 +123,7 @@ function renderToolbar() {
   $('prefix').hidden = !state.prefixArmed;
   renderNotice(tab.notice);
   renderFind(state.find, tab.id);
+  renderDownloads(state.downloads);
 
   const address = $('address');
   // Don't clobber what the user is typing, unless they switched tabs.
@@ -152,6 +153,29 @@ function renderNotice(notice) {
     'Electron, which Herdr Browser runs on, has no passkey support. Use another sign-in option, or open the page in a browser that supports passkeys.';
   $('notice-open').hidden = !notice.browser;
   $('notice-open').textContent = `Open in ${notice.browser}`;
+}
+
+// The download button shows once there is something to list, like Chrome's, with a ring around
+// it filling up while files download (spinning when their size isn't known).
+function renderDownloads(downloads) {
+  const button = $('downloads');
+  button.hidden = !downloads?.any;
+  if (!downloads) return;
+  const running = downloads.active > 0;
+  button.classList.toggle('open', downloads.open);
+  button.classList.toggle('running', running);
+  button.classList.toggle('indeterminate', running && downloads.progress === null);
+  const filled = running && downloads.progress !== null ? Math.round(downloads.progress * 100) : 25;
+  $('downloads-ring').setAttribute('stroke-dasharray', `${filled} 100`);
+  const keys = window.herdr.platform === 'darwin' ? 'Cmd+Option+L' : 'Ctrl+J';
+  button.title = running ? `Downloading ${downloads.active} file${downloads.active > 1 ? 's' : ''} (${keys})` : `Downloads (${keys})`;
+}
+
+// Where the panel goes: under the download button, or the settings button while there's none.
+function downloadsAnchor() {
+  const button = $('downloads').hidden ? $('settings') : $('downloads');
+  const { left, bottom, width } = button.getBoundingClientRect();
+  return { x: left, y: bottom, width };
 }
 
 // ---------- inline rename ----------
@@ -235,6 +259,7 @@ $('forward').onclick = () => cmd('forward');
 $('reload').onclick = () => cmd(state?.nav.loading ? 'stop' : 'reload');
 $('sidebar-toggle').onclick = () => cmd('toggleSidebar');
 $('settings').onclick = () => cmd('openSettings');
+$('downloads').onclick = () => cmd('toggleDownloads', downloadsAnchor());
 $('collapse').onclick = () => cmd('toggleSidebar');
 $('notice-open').onclick = () => cmd('openExternally');
 $('notice-dismiss').onclick = () => cmd('dismissNotice');
@@ -341,6 +366,14 @@ window.herdr.on('focus-find', () => {
   $('find-input').focus();
   $('find-input').select();
 });
+
+// Progress of running downloads comes on its own, so the rest of the UI isn't redrawn for it.
+window.herdr.on('downloads', (downloads) => {
+  if (state) state.downloads = downloads;
+  renderDownloads(downloads);
+});
+window.herdr.on('show-downloads', () => cmd('showDownloads', downloadsAnchor()));
+window.addEventListener('resize', () => state?.downloads?.open && cmd('showDownloads', downloadsAnchor()));
 
 window.herdr.on('state', (s) => {
   state = s;

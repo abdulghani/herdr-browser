@@ -18,10 +18,12 @@ src/
     keyboard/      keyboard shortcuts (bindings.js holds the key tables)
     passkeys/      the passkey notice and opening a page in another browser
     context-menu/  the right-click menu
-  lib/             small shared functions with no Electron in them (url, keys, fuzzy)
+    downloads/     saving downloads, the list of recent ones (downloads.json) and the downloads panel
+  lib/             small shared functions with no Electron in them (url, keys, fuzzy, files, format)
   ui/              code that runs inside pages, not in the main process
     browser/       the browser UI: sidebar, tabs, address bar (index.html, renderer.js, styles.css, preload.js)
     suggestions/   the address bar suggestion list
+    downloads/     the downloads panel under the toolbar's download button
     settings/      the herdr://settings page
     page-preload.js  runs in every web page
   testing/         helpers for tests only (fake Electron, DOM helpers); not shipped

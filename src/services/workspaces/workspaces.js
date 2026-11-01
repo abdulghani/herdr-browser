@@ -36,6 +36,7 @@ function createWorkspaces(ctx) {
       prefixArmed: ctx.keyboard.prefixArmed(),
       awake: ctx.views.awake(),
       find: ctx.find.get(tab.id) || null,
+      downloads: ctx.downloads.summary(),
       nav: {
         canGoBack: wc ? wc.navigationHistory.canGoBack() : false,
         canGoForward: wc ? wc.navigationHistory.canGoForward() : false,

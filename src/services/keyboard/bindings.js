@@ -65,6 +65,10 @@ function directActions(ctx) {
     f12: () => page()?.toggleDevTools(),
     'ctrl+shift+i': () => page()?.toggleDevTools(),
     'cmd+shift+j': () => page()?.toggleDevTools(),
+    // Downloads, like Chrome. With Option held, macOS reports L as ¬.
+    'ctrl+j': () => ctx.downloads.toggle(),
+    'alt+cmd+l': () => ctx.downloads.toggle(),
+    'alt+cmd+¬': () => ctx.downloads.toggle(),
     'ctrl+=': () => zoom(0.5),
     'ctrl+shift+=': () => zoom(0.5),
     'ctrl+-': () => zoom(-0.5),

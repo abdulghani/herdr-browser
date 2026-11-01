@@ -15,9 +15,9 @@ export default [
     files: ['src/ui/**/preload.js', 'src/ui/page-preload.js'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
   },
-  // The browser UI, suggestions overlay and settings page are plain browser scripts.
+  // The browser UI, suggestions and downloads overlays and settings page are plain browser scripts.
   {
-    files: ['src/ui/browser/renderer.js', 'src/ui/suggestions/suggest.js', 'src/ui/settings/settings.js'],
+    files: ['src/ui/browser/renderer.js', 'src/ui/suggestions/suggest.js', 'src/ui/downloads/downloads.js', 'src/ui/settings/settings.js'],
     languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
   },
   // Tests (next to the files they test), their helpers and the config files are ES modules.

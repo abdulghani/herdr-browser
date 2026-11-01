@@ -59,6 +59,7 @@ const SHORTCUTS = [
   ['Move tab / workspace', 'Alt+Shift+arrows'],
   ['Address bar', 'Ctrl+L', 'Cmd+L'],
   ['Find in page', 'Ctrl+F', 'Cmd+F'],
+  ['Downloads', 'Ctrl+J', 'Cmd+Option+L'],
   ['Back / forward', 'Ctrl+[ / Ctrl+]'],
   ['Reload', 'Ctrl+R'],
   ['Collapse sidebar', 'Ctrl+B'],

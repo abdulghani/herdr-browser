@@ -329,6 +329,70 @@ main {
 #settings {
   margin-left: 6px;
 }
+/* The download button: an arrow into a tray, with a ring around it filling up while files download. */
+#downloads {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  margin-left: 6px;
+  padding: 0;
+}
+#downloads[hidden] {
+  display: none;
+}
+#downloads + #settings {
+  margin-left: 2px;
+}
+#downloads.open {
+  color: var(--fg);
+  background: var(--panel-2);
+}
+#downloads.running {
+  color: var(--accent);
+}
+#downloads .dl-arrow {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#downloads .dl-ring {
+  position: absolute;
+  inset: 0;
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke-width: 2;
+  transform: rotate(-90deg); /* start at 12 o'clock */
+  visibility: hidden;
+}
+#downloads.running .dl-ring {
+  visibility: visible;
+}
+#downloads .dl-ring-track {
+  stroke: var(--border);
+}
+#downloads .dl-ring-bar {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.2s;
+}
+#downloads.indeterminate .dl-ring {
+  animation: dl-spin 1s linear infinite;
+}
+@keyframes dl-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
 #prefix {
   margin-left: 8px;
   padding: 3px 8px;
