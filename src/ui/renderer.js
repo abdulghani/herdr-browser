@@ -223,6 +223,7 @@ $('back').onclick = () => cmd('back');
 $('forward').onclick = () => cmd('forward');
 $('reload').onclick = () => cmd(state?.nav.loading ? 'stop' : 'reload');
 $('sidebar-toggle').onclick = () => cmd('toggleSidebar');
+$('settings').onclick = () => cmd('openSettings');
 $('collapse').onclick = () => cmd('toggleSidebar');
 $('notice-open').onclick = () => cmd('openExternally');
 $('notice-dismiss').onclick = () => cmd('dismissNotice');

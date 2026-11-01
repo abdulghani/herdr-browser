@@ -11,6 +11,9 @@ workspaces stacked in a vertical sidebar, each holding its own row of horizontal
 - Closed tabs and workspaces can be reopened (`Cmd+Shift+T` on macOS), even after a restart
 - Tabs left unviewed for 10 minutes sleep to free memory (dimmed icon in a dashed ring) and
   reload, with their history, when selected; tabs in a call or playing sound stay awake
+- Settings open in a tab (`Cmd+,`, the ⚙ button, or `herdr://settings`). DNS: use the system's
+  servers or a secure (DNS over HTTPS) one: Cloudflare, Google, Quad9, AdGuard or your own,
+  and test a lookup
 
 ## Install
 
@@ -83,6 +86,7 @@ Mirrors the herdr config: `Ctrl+Space` is the prefix.
 | Move tab / workspace | `Alt+Shift+arrows` | |
 | Collapse sidebar | prefix `b` | `Ctrl+B` |
 | Address bar / back / forward | | `Ctrl+L` / `Ctrl+[` / `Ctrl+]` |
+| Settings | | `Ctrl+,` (`Cmd+,` on macOS) |
 
 While typing in a text box, `Alt+arrows` (Option on a Mac) move the cursor by word or line as usual,
 and `Alt+Shift+arrows` select text, instead of switching or moving tabs.

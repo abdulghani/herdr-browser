@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data: herdr:; style-src 'self'">
   <title>Herdr Browser</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -24,6 +24,7 @@
       <div><kbd>A-S-arrows</kbd> move tab/ws</div>
       <div><kbd>C-t</kbd> <kbd>C-w</kbd> <kbd>C-l</kbd> <kbd>C-1-9</kbd> ws</div>
       <div><kbd>C-[</kbd>/<kbd>C-]</kbd> back/forward</div>
+      <div><kbd>C-,</kbd> settings</div>
     </footer>
     <button id="help-toggle" title="Keybindings (Ctrl+Space ?)">?</button>
   </aside>
@@ -39,6 +40,7 @@
       <button id="reload" title="Reload (Ctrl+R)">↻</button>
       <form id="address-form"><input id="address" spellcheck="false" autocomplete="off" placeholder="Search or enter address"></form>
       <span id="prefix" hidden>PREFIX</span>
+      <button id="settings" title="Settings (Cmd+,)">⚙&#xFE0E;</button>
     </div>
     <div id="notice" hidden>
       <span id="notice-text"></span>
