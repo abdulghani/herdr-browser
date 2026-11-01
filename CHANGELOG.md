@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.2 (2026-11-01)
+
+* Add a settings tab with DNS, Shortcuts and About by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/14
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.1...v0.3.2
+
 ## v0.3.1 (2026-11-01)
 
 * Release 0.3.0 by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/10
