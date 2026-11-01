@@ -53,6 +53,14 @@ The AppImage needs FUSE 2 (`sudo pacman -S fuse2` on Arch), or run it with
 Set `HERDR_BROWSER_PROFILE=/some/dir` to run with a separate profile, e.g. alongside your
 everyday instance while developing.
 
+## Releases
+
+Merging a pull request that changes `src/` makes a new release on its own
+(`.github/workflows/release.yml`): the version goes up, the merged pull requests are added to
+`CHANGELOG.md`, and the Mac dmgs and the Linux AppImage are built and attached to a GitHub release.
+The version goes up by a patch (0.3.0 → 0.3.1) unless the pull request has the label
+`release:minor` (→ 0.4.0) or `release:major` (→ 1.0.0). Label it `skip-release` to not release.
+
 ## Known limitations
 
 - **Passkeys don't work.** Electron has no WebAuthn support on Linux or macOS
