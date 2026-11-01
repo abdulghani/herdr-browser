@@ -1,0 +1,148 @@
+# When a pull request that changes the app's source is merged into main, bump the version,
+# add the merged pull requests to CHANGELOG.md, build the Mac and Linux apps and publish them
+# as a GitHub release.
+#
+# The version goes up by a patch (0.3.0 -> 0.3.1) unless the pull request has one of these labels:
+#   release:minor   0.3.0 -> 0.4.0
+#   release:major   0.3.0 -> 1.0.0
+#   skip-release    no release at all
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+    paths:
+      - 'src/**'
+
+# One release at a time, in the order the pull requests were merged.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    if: github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'skip-release')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Bump version
+        id: version
+        env:
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          bump="patch"
+          if echo "$LABELS" | grep -q '"release:major"'; then bump="major"
+          elif echo "$LABELS" | grep -q '"release:minor"'; then bump="minor"
+          fi
+          npm version "$bump" --no-git-tag-version
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "previous=$(git describe --tags --abbrev=0 --match 'v*')" >> "$GITHUB_OUTPUT"
+
+      - name: Write release notes and changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f target_commitish=main -f previous_tag_name="$PREVIOUS" \
+            --jq .body > notes.md
+          {
+            echo "# Changelog"
+            echo
+            echo "## $TAG ($(date -u +%Y-%m-%d))"
+            echo
+            # GitHub's notes start with a "What's Changed" heading; the version heading replaces it.
+            grep -v "^## What's Changed" notes.md
+            echo
+            [ -f CHANGELOG.md ] && tail -n +3 CHANGELOG.md
+          } > CHANGELOG.new
+          mv CHANGELOG.new CHANGELOG.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes
+          path: notes.md
+
+      - name: Commit and tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "Release ${TAG#v}"
+          git tag "$TAG"
+          git push origin HEAD:main "$TAG"
+
+  build:
+    needs: bump
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            args: --mac dmg --arm64 --x64
+          - os: ubuntu-latest
+            args: --linux AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: [bump, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.bump.outputs.tag }}
+        run: |
+          {
+            cat artifacts/notes/notes.md
+            echo
+            echo "## Install"
+            echo
+            echo "**macOS:** download \`HerdrBrowser-${TAG#v}-arm64.dmg\` (Apple Silicon) or \`HerdrBrowser-${TAG#v}-x64.dmg\` (Intel), open it and drag Herdr Browser to Applications. The app isn't notarized, so the first time macOS blocks it: open System Settings → Privacy & Security and click **Open Anyway**."
+            echo
+            echo "**Linux:** download the \`.AppImage\`, make it executable (\`chmod +x\`) and run it."
+          } > body.md
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Herdr Browser ${TAG#v}" \
+            --notes-file body.md artifacts/app-*/*
