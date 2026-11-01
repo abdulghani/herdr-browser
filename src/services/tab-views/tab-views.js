@@ -3,12 +3,12 @@ const { WebContentsView } = require('electron');
 const path = require('path');
 const { BLANK_URL, normalizeUrl } = require('../../lib/url');
 
-const SIDEBAR_WIDTH = 220;
-const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match src/ui/browser/styles.css
-const CHROME_HEIGHT = 76; // tab strip + toolbar, must match src/ui/browser/styles.css
-const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match src/ui/browser/styles.css
-const FIND_HEIGHT = 36; // per-tab find bar under the notice bar, must match src/ui/browser/styles.css
-const BLANK_BG = '#0b0d10'; // --bg in src/ui/browser/styles.css, so a blank tab isn't a white flash
+const SIDEBAR_WIDTH = 220; // --spacing-sidebar in src/ui/lib/theme.css
+const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, --spacing-sidebar-collapsed in src/ui/lib/theme.css
+const CHROME_HEIGHT = 76; // tab strip + toolbar, --spacing-tabstrip + --spacing-toolbar in src/ui/lib/theme.css
+const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, --spacing-notice in src/ui/lib/theme.css
+const FIND_HEIGHT = 36; // per-tab find bar under the notice bar, --spacing-find in src/ui/lib/theme.css
+const BLANK_BG = '#0b0d10'; // --color-bg in src/ui/lib/theme.css, so a blank tab isn't a white flash
 const PAGE_PRELOAD = path.join(__dirname, '..', '..', 'ui', 'page-preload.js');
 
 function createTabViews(ctx) {

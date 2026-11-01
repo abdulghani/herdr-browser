@@ -1,0 +1,17 @@
+/* Plain icon and text buttons, as in the browser UI and the downloads panel. Import after theme.css. */
+@layer base {
+  button {
+    color: var(--color-muted);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0 6px;
+  }
+  button:hover:not(:disabled) {
+    color: var(--color-fg);
+    background: var(--color-panel-2);
+  }
+  button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}

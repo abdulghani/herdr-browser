@@ -168,6 +168,9 @@ jobs:
 
       - run: npm ci
 
+      # The pages (src/ui) are built into dist-ui/, which the app loads.
+      - run: npm run build:ui
+
       - run: npx electron-builder ${{ matrix.args }} --publish never
 
       # The About tab in settings shows the version from the app's package.json; make sure every

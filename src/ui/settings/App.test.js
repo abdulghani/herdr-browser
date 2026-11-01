@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadBody } from '../../testing/dom.js';
+import { cleanup, render } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import App from './App.svelte';
 
 const providers = [
   { id: 'system', name: 'System', detail: 'Your network' },
@@ -11,10 +13,13 @@ const about = { platform: 'linux', version: '1.2.3', chrome: '140', electron: '4
 
 let api;
 const $ = (id) => document.getElementById(id);
-const flush = () => new Promise((resolve) => setTimeout(resolve));
+const flush = async () => {
+  await new Promise((resolve) => setTimeout(resolve));
+  flushSync();
+};
 
 async function open({ hash = '', provider = 'system', platform = 'linux' } = {}) {
-  loadBody('src/ui/settings/index.html');
+  cleanup();
   history.replaceState(null, '', `/${hash}`);
   api = {
     get: vi.fn(async () => ({
@@ -26,15 +31,21 @@ async function open({ hash = '', provider = 'system', platform = 'linux' } = {})
     resolve: vi.fn(),
   };
   window.herdrSettings = api;
-  vi.resetModules();
-  await import('./settings.js');
+  render(App);
   await flush();
 }
+
+afterEach(cleanup);
 
 const selectedTab = () => document.querySelector('[role="tab"][aria-selected="true"]').dataset.tab;
 const visiblePanels = () => [...document.querySelectorAll('[role="tabpanel"]')].filter((p) => !p.hidden).map((p) => p.id);
 const radio = (id) => document.querySelector(`input[name="dns"][value="${id}"]`);
-const submit = (form) => form.dispatchEvent(new Event('submit', { cancelable: true }));
+const click = (el) => flushSync(() => el.click());
+const submit = (form) => flushSync(() => form.dispatchEvent(new Event('submit', { cancelable: true })));
+const typeInto = (input, value) => {
+  input.value = value;
+  flushSync(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+};
 
 describe('tabs', () => {
   beforeEach(() => open());
@@ -49,22 +60,22 @@ describe('tabs', () => {
   });
 
   it('switches tab on click and keeps it in the URL', () => {
-    document.querySelector('[data-tab="shortcuts"]').click();
+    click(document.querySelector('[data-tab="shortcuts"]'));
     expect(selectedTab()).toBe('shortcuts');
     expect(visiblePanels()).toEqual(['shortcuts']);
     expect(location.hash).toBe('#shortcuts');
   });
 
   it('ignores clicks between tabs', () => {
-    $('tabs').click();
+    click($('tabs'));
     expect(selectedTab()).toBe('dns');
   });
 
   it('moves between tabs with the up and down arrows, wrapping around', () => {
     const tabs = $('tabs');
     const key = (k) => {
-      const e = new KeyboardEvent('keydown', { key: k, cancelable: true });
-      tabs.dispatchEvent(e);
+      const e = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+      flushSync(() => tabs.dispatchEvent(e));
       return e;
     };
     document.querySelector('[data-tab="dns"]').focus();
@@ -74,6 +85,7 @@ describe('tabs', () => {
     key('ArrowUp');
     key('ArrowUp');
     expect(selectedTab()).toBe('about');
+    expect(location.hash).toBe('#about');
     key('ArrowDown');
     expect(selectedTab()).toBe('dns');
     expect(key('ArrowLeft').defaultPrevented).toBe(false);
@@ -85,11 +97,13 @@ describe('opening with a tab in the URL', () => {
   it('shows that tab', async () => {
     await open({ hash: '#about' });
     expect(selectedTab()).toBe('about');
+    expect(visiblePanels()).toEqual(['about']);
   });
 
   it('falls back to the first tab for an unknown one', async () => {
     await open({ hash: '#nope' });
     expect(selectedTab()).toBe('dns');
+    expect(location.hash).toBe('#dns');
   });
 });
 
@@ -103,6 +117,7 @@ describe('shortcuts and about', () => {
     expect(list).toContainEqual(['Close tab', 'Ctrl+W']);
     expect(list).toContainEqual(['Downloads', 'Ctrl+J']);
     expect(list.find(([action]) => action === 'Reopen closed tab')).toBeUndefined();
+    expect(list).toHaveLength(18);
   });
 
   it('lists the macOS keys on a Mac', async () => {
@@ -112,12 +127,23 @@ describe('shortcuts and about', () => {
     expect(list).toContainEqual(['Close tab', 'Ctrl+W']);
     expect(list).toContainEqual(['Reopen closed tab', 'Cmd+Shift+T']);
     expect(list).toContainEqual(['Downloads', 'Cmd+Option+L']);
+    expect(list).toHaveLength(19);
   });
 
   it('lists the versions and profile folder', async () => {
     await open();
     const text = [...document.querySelectorAll('#about-list > *')].map((n) => n.textContent);
     expect(text).toEqual(['Version', '1.2.3', 'Chromium', '140', 'Electron', '45', 'Profile folder', about.profile]);
+  });
+});
+
+describe('before the settings load', () => {
+  it('shows the tabs with empty lists', () => {
+    cleanup();
+    window.herdrSettings = { get: () => new Promise(() => {}) };
+    render(App);
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(3);
+    expect(document.querySelectorAll('#shortcut-list tr, #about-list > *, #dns-providers label')).toHaveLength(0);
   });
 });
 
@@ -135,22 +161,23 @@ describe('DNS form', () => {
   it('shows the server address only for a custom server', async () => {
     await open({ provider: 'custom' });
     expect($('custom-row').hidden).toBe(false);
-    radio('system').click();
+    click(radio('system'));
     expect($('custom-row').hidden).toBe(true);
-    radio('custom').click();
+    click(radio('custom'));
     expect($('custom-row').hidden).toBe(false);
   });
 
   it('saves the chosen server', async () => {
     await open();
-    radio('custom').click();
-    $('custom-url').value = 'https://mine.example/dns-query';
+    click(radio('custom'));
+    typeInto($('custom-url'), 'https://mine.example/dns-query');
     submit($('dns-form'));
     expect($('dns-save').disabled).toBe(true);
     await flush();
     expect(api.setDns).toHaveBeenCalledWith({ provider: 'custom', customUrl: 'https://mine.example/dns-query' });
     expect($('dns-status').textContent).toBe('Saved. New lookups use this server.');
-    expect($('dns-status').className).toBe('ok');
+    expect($('dns-status').classList.contains('ok')).toBe(true);
+    expect($('dns-status').classList.contains('text-ok')).toBe(true);
     expect($('dns-save').disabled).toBe(false);
   });
 
@@ -160,7 +187,8 @@ describe('DNS form', () => {
     submit($('dns-form'));
     await flush();
     expect($('dns-status').textContent).toBe('Not a valid https URL');
-    expect($('dns-status').className).toBe('error');
+    expect($('dns-status').classList.contains('error')).toBe(true);
+    expect($('dns-status').classList.contains('text-error')).toBe(true);
     expect($('dns-save').disabled).toBe(false);
   });
 });
@@ -172,7 +200,7 @@ describe('lookup test', () => {
   it('lists the addresses found', async () => {
     let answer;
     api.resolve.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    $('resolve-host').value = '  example.com ';
+    typeInto($('resolve-host'), '  example.com ');
     submit($('resolve-form'));
     expect(api.resolve).toHaveBeenCalledWith('example.com');
     expect(results().map((li) => li.textContent)).toEqual(['Looking up…']);
@@ -191,18 +219,24 @@ describe('lookup test', () => {
 
   it('shows a lookup error', async () => {
     api.resolve.mockResolvedValueOnce({ error: 'ENOTFOUND' });
-    $('resolve-host').value = 'nope.invalid';
+    typeInto($('resolve-host'), 'nope.invalid');
     submit($('resolve-form'));
     await flush();
     expect(results()).toHaveLength(1);
-    expect(results()[0].className).toBe('error');
+    expect(results()[0].classList.contains('error')).toBe(true);
     expect(results()[0].textContent).toBe("Couldn't look up nope.invalid: ENOTFOUND");
   });
 
   it('does nothing without a host', () => {
-    $('resolve-host').value = '   ';
+    typeInto($('resolve-host'), '   ');
     submit($('resolve-form'));
     expect(api.resolve).not.toHaveBeenCalled();
     expect(results()).toHaveLength(0);
+  });
+
+  it('looks up example.com by default', () => {
+    api.resolve.mockReturnValueOnce(new Promise(() => {}));
+    submit($('resolve-form'));
+    expect(api.resolve).toHaveBeenCalledWith('example.com');
   });
 });

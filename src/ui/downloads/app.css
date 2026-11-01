@@ -1,0 +1,26 @@
+/* The downloads panel, drawn in its own view on top of the page. Sizes in the components must
+   match src/services/downloads/downloads.js. */
+@import '../lib/theme.css';
+@import '../lib/buttons.css';
+
+@theme {
+  --animate-dl-slide: dl-slide 1.2s ease-in-out infinite;
+  @keyframes dl-slide {
+    from {
+      left: -30%;
+    }
+    to {
+      left: 100%;
+    }
+  }
+}
+
+@layer base {
+  body {
+    background: transparent;
+    font-size: 12px;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+}

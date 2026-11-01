@@ -4,64 +4,8 @@
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data: herdr:; style-src 'self'" />
     <title>Herdr Browser</title>
-    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <aside id="sidebar">
-      <header>
-        <span class="label">workspaces</span>
-        <button id="new-ws" title="New workspace (Ctrl+Space Shift+C)">+</button>
-        <button id="collapse" title="Collapse sidebar (Ctrl+B)">«</button>
-      </header>
-      <ol id="workspaces"></ol>
-      <footer id="help" hidden>
-        <div><kbd>C-Space</kbd> prefix</div>
-        <div><kbd>c</kbd>/<kbd>k</kbd>/<kbd>r</kbd> new/close/rename tab</div>
-        <div><kbd>C</kbd>/<kbd>K</kbd>/<kbd>R</kbd> same for workspace</div>
-        <div><kbd>n</kbd>/<kbd>p</kbd> <kbd>N</kbd>/<kbd>P</kbd> next/prev</div>
-        <div><kbd>1-9</kbd> tab · <kbd>b</kbd> collapse sidebar</div>
-        <div><kbd>A-←→</kbd> tabs · <kbd>A-↑↓</kbd> workspaces</div>
-        <div><kbd>A-S-arrows</kbd> move tab/ws</div>
-        <div><kbd>C-t</kbd> <kbd>C-w</kbd> <kbd>C-l</kbd> <kbd>C-1-9</kbd> ws</div>
-        <div><kbd>C-[</kbd>/<kbd>C-]</kbd> back/forward</div>
-        <div><kbd>C-,</kbd> settings · <kbd>C-j</kbd> downloads</div>
-      </footer>
-      <button id="help-toggle" title="Keybindings (Ctrl+Space ?)">?</button>
-    </aside>
-    <main>
-      <nav id="tabstrip">
-        <ol id="tabs"></ol>
-        <button id="new-tab" title="New tab (Ctrl+T)">+</button>
-      </nav>
-      <div id="toolbar">
-        <button id="sidebar-toggle" title="Collapse/expand sidebar (Ctrl+B)">☰</button>
-        <button id="back" title="Back (Ctrl+[)">←</button>
-        <button id="forward" title="Forward (Ctrl+])">→</button>
-        <button id="reload" title="Reload (Ctrl+R)">↻</button>
-        <form id="address-form"><input id="address" spellcheck="false" autocomplete="off" placeholder="Search or enter address" /></form>
-        <span id="prefix" hidden>PREFIX</span>
-        <button id="downloads" title="Downloads" hidden>
-          <svg class="dl-ring" viewBox="0 0 28 28" aria-hidden="true">
-            <circle class="dl-ring-track" cx="14" cy="14" r="12" />
-            <circle id="downloads-ring" class="dl-ring-bar" cx="14" cy="14" r="12" pathLength="100" stroke-dasharray="0 100" />
-          </svg>
-          <svg class="dl-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M3 13.5h10" /></svg>
-        </button>
-        <button id="settings" title="Settings (Cmd+,)">⚙&#xFE0E;</button>
-      </div>
-      <div id="notice" hidden>
-        <span id="notice-text"></span>
-        <button id="notice-open"></button>
-        <button id="notice-dismiss" title="Dismiss">×</button>
-      </div>
-      <div id="find" hidden>
-        <input id="find-input" spellcheck="false" autocomplete="off" placeholder="Find in page" />
-        <span id="find-count"></span>
-        <button id="find-prev" title="Previous match (Shift+Enter, Cmd+Shift+G)">↑</button>
-        <button id="find-next" title="Next match (Enter, Cmd+G)">↓</button>
-        <button id="find-close" title="Close (Esc)">×</button>
-      </div>
-    </main>
-    <script src="renderer.js"></script>
+    <script type="module" src="./main.js"></script>
   </body>
 </html>

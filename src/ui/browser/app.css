@@ -1,0 +1,45 @@
+/* The browser UI. Most styling is Tailwind classes in the components; this holds what they can't say. */
+@import '../lib/theme.css';
+@import '../lib/buttons.css';
+
+@theme {
+  --animate-dl-spin: dl-spin 1s linear infinite;
+  @keyframes dl-spin {
+    from {
+      transform: rotate(-90deg);
+    }
+    to {
+      transform: rotate(270deg);
+    }
+  }
+}
+
+@layer base {
+  body {
+    font-size: 12px;
+    overflow: hidden;
+    user-select: none;
+  }
+  kbd {
+    color: var(--color-accent);
+    font: inherit;
+  }
+}
+
+/* Not loaded (never opened yet, or put to sleep to save memory): like Chrome, a dimmed favicon
+   inside a dashed circle. The ring is an SVG background (CSS outlines can't set dash length),
+   drawn in the padding. Stroke color is --color-muted. */
+@utility sleeping-ring {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='10.25' fill='none' stroke='%236e7681' stroke-width='1.5' pathLength='48' stroke-dasharray='5 3' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  filter: grayscale(1) opacity(0.6);
+}
+
+/* macOS: the tab strip is the title bar. Empty space in the top bars drags the window; anything
+   clickable opts out. */
+.platform-darwin .app-drag {
+  -webkit-app-region: drag;
+}
+.platform-darwin .app-no-drag {
+  -webkit-app-region: no-drag;
+}

@@ -48,13 +48,14 @@ On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses th
 
 ```sh
 npm install
-npm start               # run from source
+npm start               # build the UI (into dist-ui/) and run from source
+npm run build:ui        # only build the UI pages (Vite: Svelte + Tailwind)
 npm test                # unit tests (vitest)
 npm run test:coverage   # unit tests with coverage; fails below 80%
 npm run lint            # eslint
 npm run format          # prettier (npm run format:check only checks)
 npm run knip            # unused files, exports and dependencies
-npm run dist            # build dist/HerdrBrowser-<version>-x86_64.AppImage
+npm run dist            # build the UI, then dist/HerdrBrowser-<version>-x86_64.AppImage
 scripts/install-linux.sh   # install the newest build from dist/
 ```
 
@@ -80,10 +81,13 @@ Tests sit next to the file they test, as `<name>.test.js`.
   - `passkeys/`: the passkey notice and opening a page in another browser
   - `context-menu/`: the right-click menu
   - `downloads/`: saving downloads, the list of recent ones, and the downloads panel
-- `src/lib/`: small shared functions (URLs, key names, fuzzy matching, file names, sizes and times)
-- `src/ui/`: the pages: `browser/` (sidebar, tabs, address bar), `suggestions/` (the suggestion
-  list), `downloads/` (the downloads panel), `settings/` (the settings page), and `page-preload.js`
-  (runs in every web page)
+- `src/lib/`: small shared functions (URLs, key names, fuzzy matching, file names, sizes and times,
+  where the built pages are)
+- `src/ui/`: the pages, written as Svelte 5 components styled with Tailwind CSS 4: `browser/`
+  (sidebar, tabs, address bar), `suggestions/` (the suggestion list), `downloads/` (the downloads
+  panel), `settings/` (the settings page), `lib/` (the shared theme), the preloads that connect each
+  page to the main process, and `page-preload.js` (runs in every web page)
+- `dist-ui/`: the pages built by Vite (`npm run build:ui`, not in git); the app loads them from here
 - `src/testing/`: helpers for the tests (not part of the app)
 
 ## Releases

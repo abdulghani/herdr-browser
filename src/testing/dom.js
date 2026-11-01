@@ -1,19 +1,10 @@
 // Runs under the jsdom test environment.
-import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { expect, vi } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const require = createRequire(import.meta.url);
-
-// Put the <body> of one of the app's HTML pages into the test document, without its <script>.
-export function loadBody(htmlFile) {
-  const html = fs.readFileSync(path.join(root, htmlFile), 'utf8');
-  const [, attrs, inner] = html.match(/<body([^>]*)>([\s\S]*)<\/body>/);
-  document.body.className = attrs.match(/class="([^"]*)"/)?.[1] ?? '';
-  document.body.innerHTML = inner.replace(/<script[\s\S]*?<\/script>/g, '');
-}
 
 // A stand-in for the parts of Electron the preloads use. `emit` plays a message from main.
 export function fakeElectron() {

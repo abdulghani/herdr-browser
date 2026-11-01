@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
+import { cleanup, render } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadBody } from '../../testing/dom.js';
+import App from './App.svelte';
 
 let herdr;
 let listeners;
 const $ = (id) => document.getElementById(id);
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();
+  flushSync();
 };
 
-async function start(platform = 'darwin') {
-  loadBody('src/ui/browser/index.html');
+function start(platform = 'darwin') {
+  cleanup();
   listeners = {};
   herdr = {
     platform,
@@ -20,8 +23,7 @@ async function start(platform = 'darwin') {
     on: vi.fn((channel, fn) => (listeners[channel] = fn)),
   };
   window.herdr = herdr;
-  vi.resetModules();
-  await import('./renderer.js');
+  render(App);
 }
 
 function makeState(changes = {}) {
@@ -61,23 +63,37 @@ const onTab = (activeTab, changes) => {
   return s;
 };
 
-const emit = (channel, payload) => listeners[channel](payload);
+// Run something, then let Svelte update the page.
+const act = (fn) => {
+  const result = fn();
+  flushSync();
+  return result;
+};
+const emit = (channel, payload) => act(() => listeners[channel](payload));
+const click = (target) => act(() => target.click());
+const fire = (target, event) => {
+  act(() => target.dispatchEvent(event));
+  return event;
+};
+const mouse = (target, type, extra = {}) => fire(target, new MouseEvent(type, { bubbles: true, cancelable: true, ...extra }));
+const typeInto = (input, value) => {
+  input.value = value;
+  fire(input, new Event('input', { bubbles: true }));
+};
+const key = (target, k, extra = {}) => fire(target, new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...extra }));
+const root = () => $('app');
 const workspaces = () => [...document.querySelectorAll('#workspaces li.ws')];
 const tabs = () => [...document.querySelectorAll('#tabs li')];
 const commands = () => herdr.cmd.mock.calls;
-const key = (target, k, extra = {}) => {
-  const e = new KeyboardEvent('keydown', { key: k, cancelable: true, ...extra });
-  target.dispatchEvent(e);
-  return e;
-};
 
-beforeEach(async () => {
+beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal('requestAnimationFrame', (fn) => fn());
-  await start();
+  start();
 });
 
 afterEach(() => {
+  cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -85,11 +101,11 @@ afterEach(() => {
 describe('start up', () => {
   it('tells main it is ready and marks the platform', () => {
     expect(herdr.ready).toHaveBeenCalled();
-    expect(document.body.classList.contains('platform-darwin')).toBe(true);
+    expect(root().classList.contains('platform-darwin')).toBe(true);
   });
 
   it('stops or reloads before any state arrives', () => {
-    $('reload').click();
+    click($('reload'));
     expect(herdr.cmd).toHaveBeenCalledWith('reload');
   });
 });
@@ -100,22 +116,28 @@ describe('rendering state', () => {
   it('lists the workspaces', () => {
     const items = workspaces();
     expect(items.map((li) => li.querySelector('.ws-name').textContent)).toEqual(['claims migration', 'research', '  ']);
-    expect(items.map((li) => li.querySelector('.ws-icon').firstChild.textContent)).toEqual(['CM', 'RE', '?']);
+    expect(items.map((li) => li.querySelector('.ws-num').textContent)).toEqual(['1', '2', '3']);
     expect(items.map((li) => li.querySelector('.ws-count').textContent)).toEqual(['2', '1', '1']);
     expect(items.map((li) => li.classList.contains('active'))).toEqual([true, false, false]);
     expect(items[0].title).toBe('claims migration (2 tabs)\n  Example\n  about:blank');
     expect(items[1].dataset.id).toBe('w2');
-    expect(document.querySelector('#workspaces .ws-add')).not.toBeNull();
+    expect(items[0].draggable).toBe(true);
+    // The initials and the add button only show in the collapsed rail.
+    expect(document.querySelector('#workspaces .ws-icon')).toBeNull();
+    expect(document.querySelector('#workspaces .ws-add')).toBeNull();
   });
 
   it('lists the tabs of the active workspace', () => {
     const items = tabs();
     expect(items.map((li) => li.querySelector('.tab-title').textContent)).toEqual(['Example', 'about:blank']);
-    expect(items.map((li) => li.className)).toEqual(['tab active', 'tab asleep']);
+    expect(items.map((li) => ['active', 'asleep'].filter((c) => li.classList.contains(c)))).toEqual([['active'], ['asleep']]);
+    expect(items.map((li) => li.querySelector('.tab-num').textContent)).toEqual(['1', '2']);
     expect(items[0].title).toBe('Example\nhttps://example.com/');
     expect(items[0].querySelector('img').getAttribute('src')).toBe('https://example.com/favicon.ico');
-    expect(items[1].querySelector('.favicon-blank')).not.toBeNull();
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    // A tab that isn't loaded shows its icon in the dashed ring.
+    expect(items[1].querySelector('.favicon-blank').classList.contains('sleeping-ring')).toBe(true);
+    expect(items[0].querySelector('img').classList.contains('sleeping-ring')).toBe(false);
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
   });
 
   it('uses a custom tab name', () => {
@@ -124,7 +146,7 @@ describe('rendering state', () => {
   });
 
   it('swaps a broken favicon for a blank one', () => {
-    tabs()[0].querySelector('img').dispatchEvent(new Event('error'));
+    fire(tabs()[0].querySelector('img'), new Event('error'));
     expect(tabs()[0].querySelector('img')).toBeNull();
     expect(tabs()[0].querySelector('.favicon-blank')).not.toBeNull();
   });
@@ -138,7 +160,7 @@ describe('rendering state', () => {
     expect($('address').value).toBe('https://example.com/');
     expect($('collapse').textContent).toBe('«');
     expect($('collapse').title).toBe('Collapse sidebar (Ctrl+B)');
-    expect(document.body.classList.contains('collapsed')).toBe(false);
+    expect(root().classList.contains('collapsed')).toBe(false);
     expect($('notice').hidden).toBe(true);
     expect($('find').hidden).toBe(true);
   });
@@ -150,11 +172,23 @@ describe('rendering state', () => {
     expect($('reload').textContent).toBe('×');
     expect($('reload').title).toBe('Stop');
     expect($('prefix').hidden).toBe(false);
-    expect(document.body.classList.contains('collapsed')).toBe(true);
+    expect(root().classList.contains('collapsed')).toBe(true);
     expect($('collapse').textContent).toBe('»');
     expect($('collapse').title).toBe('Expand sidebar (Ctrl+B)');
-    $('reload').click();
+    click($('reload'));
     expect(herdr.cmd).toHaveBeenLastCalledWith('stop');
+  });
+
+  it('shows initials, numbers and an add button in the collapsed rail', () => {
+    emit('state', makeState({ sidebarCollapsed: true }));
+    const items = workspaces();
+    expect(items.map((li) => li.querySelector('.ws-icon').firstChild.textContent)).toEqual(['CM', 'RE', '?']);
+    expect(items.map((li) => li.querySelector('.ws-badge').textContent)).toEqual(['1', '2', '3']);
+    expect(items[0].querySelector('.ws-name')).toBeNull();
+    expect($('new-ws')).toBeNull();
+    expect($('help')).toBeNull();
+    click(document.querySelector('#workspaces .ws-add'));
+    expect(herdr.cmd).toHaveBeenLastCalledWith('newWorkspace');
   });
 
   it('leaves the address bar empty on a blank page', () => {
@@ -164,11 +198,34 @@ describe('rendering state', () => {
 
   it("doesn't overwrite what is typed in the address bar, unless the tab changes", () => {
     $('address').focus();
-    $('address').value = 'typing';
+    typeInto($('address'), 'typing');
     emit('state', makeState());
     expect($('address').value).toBe('typing');
     emit('state', onTab(1));
     expect($('address').value).toBe('');
+  });
+});
+
+describe('macOS title bar', () => {
+  it('makes the empty top bars drag the window, but not what is clickable in them', () => {
+    emit('state', makeState());
+    expect(document.querySelector('#sidebar header').classList.contains('app-drag')).toBe(true);
+    expect($('tabstrip').classList.contains('app-drag')).toBe(true);
+    for (const el of [$('new-ws'), $('collapse'), $('new-tab'), tabs()[0]]) expect(el.classList.contains('app-no-drag')).toBe(true);
+    // Room for the window buttons.
+    expect(document.querySelector('#sidebar header').classList.contains('pl-20')).toBe(true);
+    emit('state', makeState({ sidebarCollapsed: true }));
+    expect(document.querySelector('#sidebar header').classList.contains('pt-tabstrip')).toBe(true);
+    expect($('tabstrip').classList.contains('pl-7')).toBe(true);
+  });
+
+  it('leaves no room for window buttons elsewhere', () => {
+    start('linux');
+    emit('state', makeState({ sidebarCollapsed: true }));
+    expect(document.querySelector('#sidebar header').classList.contains('pt-tabstrip')).toBe(false);
+    expect($('tabstrip').classList.contains('pl-7')).toBe(false);
+    emit('state', makeState());
+    expect(document.querySelector('#sidebar header').classList.contains('pl-20')).toBe(false);
   });
 });
 
@@ -215,7 +272,7 @@ describe('find bar', () => {
     emit('state', makeState({ find: { text: 'ca', active: 0, total: 0 } }));
     emit('focus-find');
     expect(document.activeElement).toBe($('find-input'));
-    $('find-input').value = 'cat';
+    typeInto($('find-input'), 'cat');
     emit('state', makeState({ find: { text: 'ca', active: 1, total: 1 } }));
     expect($('find-input').value).toBe('cat');
     emit('state', onTab(1, { find: { text: 'dog', active: 0, total: 0 } }));
@@ -225,8 +282,7 @@ describe('find bar', () => {
   it('sends what is typed and the find keys', () => {
     emit('state', makeState({ find: { text: '', active: 0, total: 0 } }));
     const input = $('find-input');
-    input.value = 'cat';
-    input.dispatchEvent(new Event('input'));
+    typeInto(input, 'cat');
     expect(herdr.cmd).toHaveBeenLastCalledWith('find', 'cat');
     key(input, 'Enter');
     expect(herdr.cmd).toHaveBeenLastCalledWith('findNext', true);
@@ -256,52 +312,50 @@ describe('buttons and clicks', () => {
     ['notice-dismiss', 'dismissNotice'],
     ['find-close', 'closeFind'],
   ])('%s sends %s', (id, name) => {
-    $(id).click();
+    click($(id));
     expect(herdr.cmd).toHaveBeenLastCalledWith(name);
   });
 
   it('find arrows go to the previous and next match', () => {
-    $('find-prev').click();
+    click($('find-prev'));
     expect(herdr.cmd).toHaveBeenLastCalledWith('findNext', false);
-    $('find-next').click();
+    click($('find-next'));
     expect(herdr.cmd).toHaveBeenLastCalledWith('findNext', true);
   });
 
   it('selects and closes workspaces', () => {
-    workspaces()[1].click();
+    click(workspaces()[1]);
     expect(herdr.cmd).toHaveBeenLastCalledWith('selectWorkspace', 'w2');
     herdr.cmd.mockClear();
-    workspaces()[1].querySelector('.close').click();
+    click(workspaces()[1].querySelector('.close'));
     expect(commands()).toEqual([['closeWorkspace', 'w2']]);
-    document.querySelector('#workspaces .ws-add').click();
-    expect(herdr.cmd).toHaveBeenLastCalledWith('newWorkspace');
   });
 
   it('selects and closes tabs, also with a middle click', () => {
-    tabs()[1].click();
+    click(tabs()[1]);
     expect(herdr.cmd).toHaveBeenLastCalledWith('selectTab', 't2');
     herdr.cmd.mockClear();
-    tabs()[1].querySelector('.close').click();
+    click(tabs()[1].querySelector('.close'));
     expect(commands()).toEqual([['closeTab', 't2']]);
-    tabs()[0].dispatchEvent(new MouseEvent('auxclick', { button: 1 }));
+    mouse(tabs()[0], 'auxclick', { button: 1 });
     expect(herdr.cmd).toHaveBeenLastCalledWith('closeTab', 't1');
     herdr.cmd.mockClear();
-    tabs()[0].dispatchEvent(new MouseEvent('auxclick', { button: 2 }));
+    mouse(tabs()[0], 'auxclick', { button: 2 });
     expect(herdr.cmd).not.toHaveBeenCalled();
   });
 
   it('opens a tab on a double click in the empty tab strip', () => {
-    $('tabstrip').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    mouse($('tabstrip'), 'dblclick');
     expect(herdr.cmd).toHaveBeenLastCalledWith('newTab');
-    $('tabs').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    mouse($('tabs'), 'dblclick');
     expect(commands()).toEqual([['newTab'], ['newTab']]);
-    $('new-tab').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    mouse($('new-tab'), 'dblclick');
     expect(commands()).toHaveLength(2);
   });
 
   it('toggles the key help', () => {
     expect($('help').hidden).toBe(true);
-    $('help-toggle').click();
+    click($('help-toggle'));
     expect($('help').hidden).toBe(false);
     emit('toggle-help');
     expect($('help').hidden).toBe(true);
@@ -314,17 +368,19 @@ describe('address bar', () => {
   it('goes to what was typed', () => {
     const address = $('address');
     address.focus();
-    address.value = 'example.org';
+    typeInto(address, 'example.org');
     const e = new Event('submit', { cancelable: true });
-    $('address-form').dispatchEvent(e);
+    fire($('address-form'), e);
     expect(e.defaultPrevented).toBe(true);
     expect(herdr.cmd).toHaveBeenCalledWith('navigate', 'example.org');
     expect(document.activeElement).not.toBe(address);
   });
 
-  it('focuses on request', () => {
+  it('focuses on request and selects the address', () => {
     emit('focus-address');
-    expect(document.activeElement).toBe($('address'));
+    const address = $('address');
+    expect(document.activeElement).toBe(address);
+    expect([address.selectionStart, address.selectionEnd]).toEqual([0, address.value.length]);
   });
 
   it('Escape returns to the page', () => {
@@ -350,8 +406,7 @@ describe('address bar suggestions', () => {
 
   async function type(text, matches = [history, tab]) {
     herdr.suggest.mockResolvedValueOnce(matches);
-    $('address').value = text;
-    $('address').dispatchEvent(new Event('input'));
+    typeInto($('address'), text);
     await flush();
   }
 
@@ -390,8 +445,7 @@ describe('address bar suggestions', () => {
   it('drops results that a newer keystroke replaced', async () => {
     let slow;
     herdr.suggest.mockReturnValueOnce(new Promise((resolve) => (slow = resolve)));
-    $('address').value = 'g';
-    $('address').dispatchEvent(new Event('input'));
+    typeInto($('address'), 'g');
     await type('gi');
     slow([tab]);
     await flush();
@@ -402,8 +456,7 @@ describe('address bar suggestions', () => {
   it('drops results that arrive after focus left', async () => {
     let slow;
     herdr.suggest.mockReturnValueOnce(new Promise((resolve) => (slow = resolve)));
-    $('address').value = 'g';
-    $('address').dispatchEvent(new Event('input'));
+    typeInto($('address'), 'g');
     $('address').blur();
     slow([tab]);
     await flush();
@@ -413,7 +466,7 @@ describe('address bar suggestions', () => {
   it('closes when typing without focus', async () => {
     await type('git');
     $('address').blur();
-    $('address').dispatchEvent(new Event('input'));
+    typeInto($('address'), 'gitx');
     expect(herdr.cmd).toHaveBeenLastCalledWith('hideSuggestions');
   });
 
@@ -484,10 +537,10 @@ describe('address bar suggestions', () => {
   });
 
   it('moves with the window while open', async () => {
-    window.dispatchEvent(new Event('resize'));
+    fire(window, new Event('resize'));
     expect(shown()).toHaveLength(0);
     await type('git');
-    window.dispatchEvent(new Event('resize'));
+    fire(window, new Event('resize'));
     expect(shown()).toHaveLength(2);
   });
 
@@ -511,29 +564,33 @@ describe('inline rename', () => {
   const renameInput = () => document.querySelector('input.rename');
 
   it('renames a tab on double click', () => {
-    tabs()[0].dispatchEvent(new MouseEvent('dblclick'));
+    mouse(tabs()[0], 'dblclick');
     const input = renameInput();
-    expect(input.parentElement.className).toBe('tab-title');
+    expect(input.parentElement.classList.contains('tab-title')).toBe(true);
     expect(input.value).toBe('Example');
     expect(document.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 7]);
     // Clicks in the input don't select or rename the tab again.
-    input.click();
-    input.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    click(input);
+    mouse(input, 'dblclick');
     expect(commands()).toEqual([]);
     // State updates wait until the rename is done.
-    emit('state', makeState());
+    emit('state', makeState({ nav: { canGoBack: false, canGoForward: false, loading: false } }));
     expect(renameInput()).toBe(input);
+    expect($('back').disabled).toBe(false);
 
     input.value = 'Mine';
     key(input, 'Enter');
     expect(commands()).toEqual([['renameTab', { id: 't1', name: 'Mine' }], ['focusContent']]);
     expect(renameInput()).toBeNull();
-    input.dispatchEvent(new FocusEvent('blur'));
+    // Then the newest state shows.
+    expect($('back').disabled).toBe(true);
+    fire(input, new FocusEvent('blur'));
     expect(commands()).toHaveLength(2);
   });
 
   it('cancels on Escape', () => {
-    tabs()[0].dispatchEvent(new MouseEvent('dblclick'));
+    mouse(tabs()[0], 'dblclick');
     key(renameInput(), 'x');
     key(renameInput(), 'Escape');
     expect(commands()).toEqual([['focusContent']]);
@@ -544,14 +601,14 @@ describe('inline rename', () => {
     emit('rename', { kind: 'tab', id: 't2' });
     const input = renameInput();
     input.value = 'Blank';
-    input.blur();
+    act(() => input.blur());
     expect(herdr.cmd).toHaveBeenCalledWith('renameTab', { id: 't2', name: 'Blank' });
   });
 
   it('renames a workspace on double click', () => {
-    workspaces()[1].dispatchEvent(new MouseEvent('dblclick'));
+    mouse(workspaces()[1], 'dblclick');
     const input = renameInput();
-    expect(input.parentElement.className).toBe('ws-name');
+    expect(input.parentElement.classList.contains('ws-name')).toBe(true);
     input.value = 'reading';
     key(input, 'Enter');
     expect(commands()).toEqual([['renameWorkspace', { id: 'w2', name: 'reading' }], ['focusContent']]);
@@ -572,8 +629,15 @@ describe('inline rename', () => {
     expect(renameInput()).toBeNull();
   });
 
+  it('a double click in the collapsed rail expands it for the rename too', () => {
+    emit('state', makeState({ sidebarCollapsed: true }));
+    mouse(workspaces()[1], 'dblclick');
+    expect(commands()).toEqual([['toggleSidebar']]);
+  });
+
   it('ignores a rename of something that is gone', () => {
     emit('rename', { kind: 'tab', id: 'nope' });
+    emit('rename', { kind: 'workspace', id: 'nope' });
     expect(renameInput()).toBeNull();
   });
 });
@@ -581,6 +645,7 @@ describe('inline rename', () => {
 describe('rename before any state', () => {
   it('does nothing', () => {
     emit('rename', { kind: 'workspace', id: 'w1' });
+    emit('rename', { kind: 'tab', id: 't1' });
     expect(document.querySelector('input.rename')).toBeNull();
     expect(herdr.cmd).not.toHaveBeenCalled();
   });
@@ -589,65 +654,79 @@ describe('rename before any state', () => {
 describe('drag and drop', () => {
   beforeEach(() => emit('state', makeState()));
 
-  const fire = (target, type) => {
+  const drag = (target, type) => {
     const e = new Event(type, { cancelable: true, bubbles: true });
     e.dataTransfer = {};
-    target.dispatchEvent(e);
-    return e;
+    return fire(target, e);
   };
+  const marks = () => document.querySelectorAll('.dragging, .drop-before, .drop-into');
 
   it('moves a tab before another tab', () => {
     const [first, second] = tabs();
-    const start = fire(first, 'dragstart');
+    const start = drag(first, 'dragstart');
     expect(start.dataTransfer.effectAllowed).toBe('move');
     expect(first.classList.contains('dragging')).toBe(true);
-    expect(fire(second, 'dragover').defaultPrevented).toBe(true);
+    expect(drag(second, 'dragover').defaultPrevented).toBe(true);
     expect(second.classList.contains('drop-before')).toBe(true);
-    fire(second, 'dragleave');
+    drag(second, 'dragleave');
     expect(second.classList.contains('drop-before')).toBe(false);
-    fire(second, 'dragover');
-    expect(fire(second, 'drop').defaultPrevented).toBe(true);
+    drag(second, 'dragover');
+    expect(drag(second, 'drop').defaultPrevented).toBe(true);
     expect(herdr.cmd).toHaveBeenCalledWith('moveTabTo', { tabId: 't1', wsId: 'w1', index: 1 });
-    fire(first, 'dragend');
-    expect(document.querySelectorAll('.dragging, .drop-before, .drop-into')).toHaveLength(0);
+    drag(first, 'dragend');
+    expect(marks()).toHaveLength(0);
+  });
+
+  it('only clears the drop mark of the item the drag left', () => {
+    const [first, second] = tabs();
+    drag(first, 'dragstart');
+    drag(second, 'dragover');
+    drag(workspaces()[1], 'dragleave');
+    expect(second.classList.contains('drop-before')).toBe(true);
+    drag(first, 'dragend');
   });
 
   it('ignores dropping a tab on itself', () => {
     const [first] = tabs();
-    fire(first, 'dragstart');
-    expect(fire(first, 'dragover').defaultPrevented).toBe(false);
-    fire(first, 'drop');
+    drag(first, 'dragstart');
+    expect(drag(first, 'dragover').defaultPrevented).toBe(false);
+    drag(first, 'drop');
     expect(herdr.cmd).not.toHaveBeenCalled();
+    drag(first, 'dragend');
   });
 
   it('moves a tab into another workspace', () => {
-    fire(tabs()[0], 'dragstart');
+    drag(tabs()[0], 'dragstart');
     const target = workspaces()[1];
-    fire(target, 'dragover');
+    drag(target, 'dragover');
     expect(target.classList.contains('drop-into')).toBe(true);
-    fire(target, 'drop');
+    drag(target, 'drop');
     expect(herdr.cmd).toHaveBeenCalledWith('moveTabTo', { tabId: 't1', wsId: 'w2' });
+    drag(tabs()[0], 'dragend');
   });
 
   it('reorders workspaces', () => {
-    fire(workspaces()[0], 'dragstart');
+    drag(workspaces()[0], 'dragstart');
+    expect(workspaces()[0].classList.contains('dragging')).toBe(true);
     const target = workspaces()[2];
-    fire(target, 'dragover');
+    drag(target, 'dragover');
     expect(target.classList.contains('drop-before')).toBe(true);
-    fire(target, 'drop');
+    drag(target, 'drop');
     expect(herdr.cmd).toHaveBeenCalledWith('moveWorkspaceTo', { wsId: 'w1', index: 2 });
+    drag(workspaces()[0], 'dragend');
   });
 
   it("doesn't drop a workspace on a tab", () => {
-    fire(workspaces()[1], 'dragstart');
-    expect(fire(tabs()[0], 'dragover').defaultPrevented).toBe(false);
-    fire(tabs()[0], 'drop');
+    drag(workspaces()[1], 'dragstart');
+    expect(drag(tabs()[0], 'dragover').defaultPrevented).toBe(false);
+    drag(tabs()[0], 'drop');
     expect(herdr.cmd).not.toHaveBeenCalled();
+    drag(workspaces()[1], 'dragend');
   });
 
   it('ignores drags that started elsewhere', () => {
-    expect(fire(tabs()[0], 'dragover').defaultPrevented).toBe(false);
-    fire(workspaces()[0], 'drop');
+    expect(drag(tabs()[0], 'dragover').defaultPrevented).toBe(false);
+    drag(workspaces()[0], 'drop');
     expect(herdr.cmd).not.toHaveBeenCalled();
   });
 });
@@ -688,10 +767,18 @@ describe('download button', () => {
     expect(ring()).toBe('50 100');
   });
 
+  it('keeps progress that came on its own when a rename ends', () => {
+    emit('state', makeState({ downloads: downloads() }));
+    mouse(tabs()[0], 'dblclick');
+    emit('downloads', downloads({ active: 1, progress: 0.5 }));
+    key(document.querySelector('input.rename'), 'Escape');
+    expect(ring()).toBe('50 100');
+  });
+
   it('toggles the panel under the button', () => {
     emit('state', makeState({ downloads: downloads() }));
     placeAt('downloads', 1300);
-    button().click();
+    click(button());
     expect(herdr.cmd).toHaveBeenLastCalledWith('toggleDownloads', { x: 1300, y: 70, width: 28 });
     emit('show-downloads');
     expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', { x: 1300, y: 70, width: 28 });
@@ -705,25 +792,26 @@ describe('download button', () => {
   });
 
   it('moves the open panel along when the window resizes', () => {
-    window.dispatchEvent(new Event('resize'));
+    fire(window, new Event('resize'));
     emit('state', makeState({ downloads: downloads() }));
-    window.dispatchEvent(new Event('resize'));
+    fire(window, new Event('resize'));
     expect(herdr.cmd).not.toHaveBeenCalled();
     emit('downloads', downloads({ open: true }));
-    window.dispatchEvent(new Event('resize'));
+    fire(window, new Event('resize'));
     expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', expect.any(Object));
   });
 
-  it('names the other keys elsewhere', async () => {
-    await start('linux');
+  it('names the other keys elsewhere', () => {
+    start('linux');
     emit('state', makeState({ downloads: downloads() }));
     expect(button().title).toBe('Downloads (Ctrl+J)');
   });
 });
 
 describe('other platforms', () => {
-  it('marks the platform', async () => {
-    await start('linux');
-    expect(document.body.className).toBe('platform-linux');
+  it('marks the platform', () => {
+    start('linux');
+    expect(root().classList.contains('platform-linux')).toBe(true);
+    expect(root().classList.contains('platform-darwin')).toBe(false);
   });
 });
