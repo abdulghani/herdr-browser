@@ -1,59 +1,65 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { press } from '../../testing/fake-electron.js';
-import { m, start, state, ui, uiSent, useMain, wc } from '../../testing/main-harness.js';
+import { m, press, start, state, tab, uiSent, useMain, view } from '../../testing/main-harness.js';
 
 useMain();
 
 describe('find in page', () => {
   beforeEach(() => start());
 
-  it('opens the find bar, searches and shows the match count', () => {
-    press(wc(), 'cmd+f');
-    expect(state().find).toEqual({ text: '', active: 0, total: 0 });
-    expect(m.shownView().bounds.y).toBe(76 + 36);
+  it('opens the find bar, searches and shows how many matches the page counted', () => {
+    press('cmd+f');
+    expect(state().find).toEqual({ text: '', total: 0 });
     expect(uiSent('focus-find')).toHaveLength(1);
 
     m.cmd('find', 'cat');
-    expect(wc().findInPage).toHaveBeenCalledWith('cat', { forward: true, findNext: false });
-    wc().emit('found-in-page', {}, { finalUpdate: false, activeMatchOrdinal: 1, matches: 9 });
+    expect(view().findInPage).toHaveBeenCalledWith('cat', { forward: true, matchCase: false });
+    expect(view().executeJavascript).toHaveBeenCalledWith('window.__herdrCountMatches?.("cat")');
+    m.pageMessage(tab().id, { type: 'find', total: 5 });
+    expect(state().find).toEqual({ text: 'cat', total: 5 });
+    m.pageMessage(tab().id, { type: 'find', total: 'lots' });
     expect(state().find.total).toBe(0);
-    wc().emit('found-in-page', {}, { finalUpdate: true, activeMatchOrdinal: 2, matches: 5 });
-    expect(state().find).toEqual({ text: 'cat', active: 2, total: 5 });
 
     m.cmd('findNext', false);
-    expect(wc().findInPage).toHaveBeenLastCalledWith('cat', { forward: false, findNext: true });
-    press(wc(), 'f3');
-    press(wc(), 'shift+f3');
-    press(wc(), 'cmd+g');
-    press(wc(), 'cmd+shift+g');
-    expect(wc().findInPage).toHaveBeenCalledTimes(6);
+    expect(view().findInPage).toHaveBeenLastCalledWith('cat', { forward: false, matchCase: false });
+    press('f3');
+    press('shift+f3');
+    press('cmd+g');
+    press('cmd+shift+g');
+    expect(view().findInPage).toHaveBeenCalledTimes(6);
+    // Only a new text is counted again.
+    expect(view().executeJavascript).toHaveBeenCalledTimes(1);
 
     m.cmd('find', '');
-    expect(wc().stopFindInPage).toHaveBeenCalledWith('clearSelection');
-    expect(state().find).toEqual({ text: '', active: 0, total: 0 });
+    expect(view().stopFindInPage).toHaveBeenCalled();
+    expect(state().find).toEqual({ text: '', total: 0 });
   });
 
-  it('closes with Escape and gives focus back to the page', () => {
-    press(wc(), 'ctrl+f');
-    press(wc(), 'ctrl+f');
-    const event = press(ui(), 'escape');
-    expect(event.preventDefault).toHaveBeenCalled();
+  it('closes with Escape', () => {
+    press('ctrl+f');
+    press('ctrl+f');
+    press('escape');
     expect(state().find).toBeNull();
-    expect(wc().stopFindInPage).toHaveBeenCalledWith('keepSelection');
-    expect(m.shownView().bounds.y).toBe(76);
-    expect(press(ui(), 'escape').preventDefault).not.toHaveBeenCalled();
+    expect(view().stopFindInPage).toHaveBeenCalled();
+    press('escape');
     m.cmd('closeFind');
+    expect(state().find).toBeNull();
   });
 
   it('opens the find bar when searching again with nothing typed', () => {
-    press(wc(), 'cmd+g');
-    expect(state().find).toEqual({ text: '', active: 0, total: 0 });
+    press('cmd+g');
+    expect(state().find).toEqual({ text: '', total: 0 });
   });
 
-  it('ignores found-in-page and find without a find bar', () => {
-    wc().emit('found-in-page', {}, { finalUpdate: true, activeMatchOrdinal: 1, matches: 1 });
+  it('ignores results and searches without a find bar or a view', () => {
+    m.pageMessage(tab().id, { type: 'find', total: 3 });
     m.cmd('find', 'x');
-    expect(wc().findInPage).not.toHaveBeenCalled();
+    expect(view().findInPage).not.toHaveBeenCalled();
+    expect(state().find).toBeNull();
+    m.ui.auto = false;
+    m.cmd('newTab');
+    press('cmd+f');
+    m.cmd('find', 'x');
+    press('escape');
     expect(state().find).toBeNull();
   });
 });

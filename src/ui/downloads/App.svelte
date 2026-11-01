@@ -1,6 +1,7 @@
 <script>
   // Draws the downloads panel from the rows the main process sends (src/services/downloads), and
-  // sends back what is clicked: open, show in folder, pause, resume, cancel, retry or remove.
+  // sends back what is clicked: open, show in folder or remove. Drawn over the page by
+  // src/ui/browser/Overlays.svelte.
   import DownloadRow from './DownloadRow.svelte';
 
   const api = window.downloads;
@@ -12,9 +13,11 @@
 </script>
 
 <!-- Pointing at the panel keeps it open when a new download opened it. -->
-<svelte:body onmouseenter={() => api.pointer()} />
-
-<section class="flex h-screen w-[360px] flex-col overflow-hidden rounded-lg border border-border bg-panel">
+<section
+  class="flex max-h-[440px] w-[360px] flex-col overflow-hidden rounded-lg border border-border bg-panel"
+  aria-label="Downloads"
+  onmouseenter={() => api.pointer()}
+>
   <header class="flex h-10 flex-none items-center gap-0.5 border-b border-border pr-2 pl-3.5">
     <span class="flex-1 font-bold text-fg">Downloads</span>
     <button id="dl-folder" class="h-6 text-[11px]" title="Open the Downloads folder" onclick={() => api.openFolder()}>Open folder</button>

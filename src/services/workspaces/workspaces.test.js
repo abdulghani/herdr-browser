@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { m, start, state, tab, uiSent, useMain, wc, ws } from '../../testing/main-harness.js';
+import { m, start, state, tab, uiSent, useMain, ws } from '../../testing/main-harness.js';
 
 useMain();
 
@@ -11,19 +11,21 @@ describe('tabs', () => {
     expect(ws().tabs).toHaveLength(2);
     expect(ws().activeTab).toBe(1);
     expect(uiSent('focus-address')).toHaveLength(1);
-    expect(m.win().children).toEqual([m.pageViews()[1]]);
+    expect(state().shown).toBe(tab().id);
+    expect(state().awake).toHaveLength(2);
   });
 
   it('closes a tab and selects its left neighbour', () => {
     m.cmd('navigate', 'a.com');
     m.cmd('newTab');
     m.cmd('navigate', 'b.com');
-    const closing = m.shownView();
+    const closing = tab().id;
     m.cmd('closeTab');
-    expect(closing.webContents.close).toHaveBeenCalled();
     expect(ws().tabs.map((t) => t.url)).toEqual(['https://a.com']);
-    expect(state().awake).toHaveLength(1);
-    expect(m.shownView()).toBe(m.pageViews()[0]);
+    expect(state().awake).toEqual([tab().id]);
+    expect(state().pages.map((p) => p.id)).not.toContain(closing);
+    expect(m.viewOf(closing)).toBeUndefined();
+    expect(state().shown).toBe(tab().id);
   });
 
   it('closing the first tab keeps the first tab selected', () => {
@@ -108,12 +110,13 @@ describe('workspaces', () => {
     m.cmd('newWorkspace');
     expect(state().workspaces.map((w) => w.name)).toEqual(['main', 'workspace 2']);
     expect(state().activeWs).toBe(1);
-    expect(m.win().children).toEqual([]);
+    expect(state().shown).toBeNull();
     expect(uiSent('rename').at(-1)[1]).toEqual({ kind: 'workspace', id: ws().id });
     m.cmd('focusContent');
-    expect(m.shownView()).toBe(m.pageViews()[1]);
+    expect(state().shown).toBe(tab().id);
+    const sends = uiSent('state').length;
     m.cmd('focusContent');
-    expect(wc().focus).toHaveBeenCalledTimes(2);
+    expect(uiSent('state')).toHaveLength(sends);
   });
 
   it('renames a workspace, ignoring blank names', () => {
@@ -156,8 +159,7 @@ describe('workspaces', () => {
   it('collapses the sidebar', () => {
     m.cmd('toggleSidebar');
     expect(state().sidebarCollapsed).toBe(true);
-    expect(m.shownView().bounds).toMatchObject({ x: 52, width: 1348 });
-    m.win().emit('resize');
-    expect(m.shownView().setBounds).toHaveBeenCalledTimes(3);
+    m.cmd('toggleSidebar');
+    expect(state().sidebarCollapsed).toBe(false);
   });
 });

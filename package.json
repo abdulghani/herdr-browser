@@ -2,22 +2,24 @@
   "name": "herdr-browser",
   "productName": "Herdr Browser",
   "version": "0.3.6",
-  "description": "Chromium browser with herdr-style layout: vertical workspaces, horizontal tabs inside each",
+  "description": "Experimental Electrobun (native WebKit) build of Herdr Browser: herdr-style layout with vertical workspaces and horizontal tabs inside each",
   "main": "src/main.js",
   "engines": {
     "node": ">=26"
   },
   "scripts": {
     "build:ui": "vite build",
-    "start": "npm run build:ui && electron .",
+    "build:icons": "scripts/make-iconset.sh",
+    "start": "electrobun prepare && npm run build:ui && npm run build:icons && electrobun dev",
+    "dev": "npm run start",
+    "build": "electrobun prepare && npm run build:ui && npm run build:icons && electrobun build --env=stable",
+    "dist:mac": "npm run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "knip": "knip",
-    "dist": "npm run build:ui && electron-builder --linux AppImage",
-    "dist:mac": "npm run build:ui && electron-builder --mac dmg --arm64 --x64"
+    "knip": "knip"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -25,8 +27,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/svelte": "^5.4.2",
     "@vitest/coverage-v8": "^5.0.5",
-    "electron": "^45.1.0",
-    "electron-builder": "^26.18.0",
+    "electrobun": "2.0.5",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.23.1",
@@ -41,77 +42,7 @@
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
   },
-  "desktopName": "herdr-browser.desktop",
-  "build": {
-    "appId": "dev.herdr.browser",
-    "files": [
-      "src/**/*.js",
-      "!src/**/*.test.js",
-      "!src/testing/**",
-      "!src/ui/**",
-      "src/ui/**/preload.js",
-      "src/ui/page-preload.js",
-      "dist-ui/**/*",
-      "package.json"
-    ],
-    "directories": {
-      "output": "dist",
-      "buildResources": "build"
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "icon": "build/icon.png",
-      "category": "Network;WebBrowser",
-      "artifactName": "HerdrBrowser-${version}-${arch}.AppImage",
-      "desktop": {
-        "entry": {
-          "StartupWMClass": "herdr-browser",
-          "MimeType": "x-scheme-handler/http;x-scheme-handler/https;text/html;"
-        }
-      },
-      "syncDesktopName": true,
-      "executableName": "herdr-browser"
-    },
-    "mac": {
-      "icon": "build/icon.png",
-      "category": "public.app-category.productivity",
-      "extendInfo": {
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLName": "Web site URL",
-            "CFBundleURLSchemes": [
-              "http",
-              "https"
-            ]
-          }
-        ],
-        "CFBundleDocumentTypes": [
-          {
-            "CFBundleTypeName": "HTML document",
-            "CFBundleTypeRole": "Viewer",
-            "LSHandlerRank": "Default",
-            "LSItemContentTypes": [
-              "public.html",
-              "public.xhtml"
-            ]
-          }
-        ]
-      },
-      "identity": "-",
-      "target": [
-        "dmg"
-      ],
-      "artifactName": "HerdrBrowser-${version}-${arch}.${ext}",
-      "hardenedRuntime": false
-    },
-    "dmg": {
-      "title": "Herdr Browser ${version}"
-    }
-  },
   "allowScripts": {
-    "electron-winstaller": false,
     "fsevents": false
   }
 }

@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { press } from '../../testing/fake-electron.js';
-import { dir, m, sessionFile, start, state, useMain, wc, writeSession, ws } from '../../testing/main-harness.js';
+import { dir, m, press, sessionFile, start, state, tab, useMain, view, writeSession, ws } from '../../testing/main-harness.js';
 
 useMain();
 
@@ -22,8 +21,8 @@ describe('session', () => {
   it('saves the session and history when the window closes', () => {
     start();
     m.cmd('navigate', 'example.com');
-    wc().title = 'Example';
-    wc().emit('did-navigate', {}, 'https://example.com/');
+    view().fire('did-navigate', 'https://example.com/');
+    m.pageMessage(tab().id, { type: 'title', title: 'Example' });
     m.win().emit('close');
     expect(JSON.parse(fs.readFileSync(sessionFile(), 'utf8')).workspaces[0].tabs[0].url).toBe('https://example.com/');
     expect(JSON.parse(fs.readFileSync(path.join(dir, 'history.json'), 'utf8'))).toEqual([
@@ -38,7 +37,7 @@ describe('session', () => {
     expect(console.error).toHaveBeenCalledWith('session save failed', expect.any(Error));
   });
 
-  it('restores workspaces, tabs, back/forward history and closed tabs', () => {
+  it('restores workspaces, tabs and closed tabs, but not back/forward history', () => {
     const history = { entries: [{ url: 'https://a.com/' }, { url: 'https://b.com/' }], index: 1 };
     writeSession({
       activeWs: 5,
@@ -54,23 +53,22 @@ describe('session', () => {
         },
         { name: 'empty', tabs: [] },
       ],
-      closed: [{ kind: 'tab', wsName: 'work', index: 0, tab: { url: 'https://c.com/', title: 'C' } }],
+      closed: [{ kind: 'tab', wsName: 'work', index: 0, tab: { url: 'https://c.com/', title: 'C', history } }],
     });
     start();
     expect(state().workspaces.map((w) => w.name)).toEqual(['work', 'empty']);
     expect(state().activeWs).toBe(1);
     expect(state().sidebarCollapsed).toBe(true);
     expect(ws(1).tabs).toEqual([expect.objectContaining({ url: 'about:blank' })]);
-    expect(m.shownView().bounds.x).toBe(52);
 
     m.cmd('selectWorkspace', ws(0).id);
     expect(ws().activeTab).toBe(1);
-    expect(wc().navigationHistory.restore).toHaveBeenCalledWith(history);
-    expect(wc().loadURL).not.toHaveBeenCalled();
-    expect(state().nav).toMatchObject({ canGoBack: true, canGoForward: false });
+    expect(tab()).not.toHaveProperty('history');
+    expect(view().url).toBe('https://b.com/');
 
-    press(wc(), 'cmd+shift+t');
+    press('cmd+shift+t');
     expect(ws().tabs.map((t) => t.url)).toEqual(['https://c.com/', 'https://a.com/', 'https://b.com/']);
+    expect(tab()).not.toHaveProperty('history');
   });
 
   it('starts fresh when the session file is broken or empty', () => {

@@ -1,11 +1,11 @@
-/* Shared by every page (browser UI, suggestions, downloads, settings): Tailwind, the colors and
-   font, and sizes the main process must agree with. Each page's app.css imports this. */
+/* Shared by every page (browser UI with the suggestions and downloads drawn in it, settings):
+   Tailwind, the colors, font and sizes. Each page's app.css imports this. */
 @import 'tailwindcss';
 
 @theme {
   /* Only these colors, so every page uses the same palette. */
   --color-*: initial;
-  --color-bg: #0b0d10; /* BLANK_BG and the window background in the main process */
+  --color-bg: #0b0d10; /* also what a blank tab shows (its view is see-through) */
   --color-panel: #12151a;
   --color-panel-2: #1a1e25;
   --color-border: #252a33;
@@ -20,13 +20,13 @@
   --font-mono: 'JetBrainsMono Nerd Font', 'JetBrains Mono', ui-monospace, monospace;
   --default-font-family: var(--font-mono);
 
-  /* Sizes the main process lays the page views out by (src/services/tab-views/tab-views.js). */
-  --spacing-sidebar: 220px; /* SIDEBAR_WIDTH */
-  --spacing-sidebar-collapsed: 52px; /* SIDEBAR_COLLAPSED_WIDTH */
-  --spacing-tabstrip: 36px; /* tabstrip + toolbar = CHROME_HEIGHT */
+  /* The bars around the page. The page views fill what is left (src/ui/browser/PageViews.svelte). */
+  --spacing-sidebar: 220px;
+  --spacing-sidebar-collapsed: 52px;
+  --spacing-tabstrip: 36px; /* also the macOS title bar: the window buttons sit in it */
   --spacing-toolbar: 40px;
-  --spacing-notice: 36px; /* NOTICE_HEIGHT */
-  --spacing-find: 36px; /* FIND_HEIGHT */
+  --spacing-notice: 36px;
+  --spacing-find: 36px;
 }
 
 @layer base {

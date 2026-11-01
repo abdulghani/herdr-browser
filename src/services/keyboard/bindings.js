@@ -1,5 +1,7 @@
 // The key tables (mirrors ~/.config/herdr/config.toml). Each action reaches the services through
-// ctx when the key is pressed.
+// ctx when the key is pressed. Keys with Cmd come from the application menu (menu.js); the others
+// from the preload in each page (src/ui/page-preload.js), which passes them on before the page
+// sees them.
 
 // The key pressed after the Ctrl+Space prefix.
 function prefixActions(ctx) {
@@ -16,7 +18,7 @@ function prefixActions(ctx) {
     'shift+r': () => ws().requestRename('workspace', ws().activeWs().id),
     'shift+n': () => ws().cycleWorkspace(1),
     'shift+p': () => ws().cycleWorkspace(-1),
-    '?': () => ctx.win.webContents.send('toggle-help'),
+    '?': () => ctx.ui.send('toggle-help'),
   };
 }
 
@@ -24,11 +26,13 @@ function prefixActions(ctx) {
 function directActions(ctx) {
   const ws = () => ctx.workspaces;
   const find = () => ctx.find;
-  const page = () => ctx.views.activeWc();
+  const views = () => ctx.views;
+  // Page zoom as a factor (1 = 100%), in steps of 10%.
   const zoom = (delta) => {
-    const wc = page();
-    if (wc) wc.setZoomLevel(wc.getZoomLevel() + delta);
+    const view = views().activeView();
+    if (view) view.setPageZoom(delta ? Math.min(5, Math.max(0.3, Math.round((view.getPageZoom() + delta) * 10) / 10)) : 1);
   };
+  const devTools = () => views().activeView()?.toggleDevTools();
   return {
     'alt+up': () => ws().cycleWorkspace(-1),
     'alt+down': () => ws().cycleWorkspace(1),
@@ -56,23 +60,33 @@ function directActions(ctx) {
     'ctrl+l': () => ws().focusAddressBar(),
     'cmd+l': () => ws().focusAddressBar(),
     'alt+d': () => ws().focusAddressBar(),
-    'ctrl+r': () => page()?.reload(),
-    f5: () => page()?.reload(),
-    'ctrl+shift+r': () => page()?.reloadIgnoringCache(),
-    'ctrl+[': () => page()?.navigationHistory.goBack(),
-    'ctrl+]': () => page()?.navigationHistory.goForward(),
+    'ctrl+r': () => views().pageAction('reload'),
+    'cmd+r': () => views().pageAction('reload'),
+    f5: () => views().pageAction('reload'),
+    // WebKit's views have no reload that skips the cache; this reloads like Ctrl+R.
+    'ctrl+shift+r': () => views().pageAction('reload'),
+    'ctrl+[': () => views().pageAction('goBack'),
+    'ctrl+]': () => views().pageAction('goForward'),
+    'cmd+[': () => views().pageAction('goBack'),
+    'cmd+]': () => views().pageAction('goForward'),
+    'cmd+w': () => ws().closeTab(),
+    'cmd+q': () => ctx.quit(),
+    'cmd+shift+]': () => ws().cycleTab(1),
+    'cmd+shift+[': () => ws().cycleTab(-1),
     'ctrl+b': () => ws().toggleSidebar(),
-    f12: () => page()?.toggleDevTools(),
-    'ctrl+shift+i': () => page()?.toggleDevTools(),
-    'cmd+shift+j': () => page()?.toggleDevTools(),
-    // Downloads, like Chrome. With Option held, macOS reports L as ¬.
+    f12: devTools,
+    'ctrl+shift+i': devTools,
+    'cmd+shift+j': devTools,
+    // Downloads, like Chrome.
     'ctrl+j': () => ctx.downloads.toggle(),
     'alt+cmd+l': () => ctx.downloads.toggle(),
-    'alt+cmd+¬': () => ctx.downloads.toggle(),
-    'ctrl+=': () => zoom(0.5),
-    'ctrl+shift+=': () => zoom(0.5),
-    'ctrl+-': () => zoom(-0.5),
-    'ctrl+0': () => page()?.setZoomLevel(0),
+    'ctrl+=': () => zoom(0.1),
+    'ctrl+shift+=': () => zoom(0.1),
+    'ctrl+-': () => zoom(-0.1),
+    'ctrl+0': () => zoom(0),
+    'cmd+=': () => zoom(0.1),
+    'cmd+-': () => zoom(-0.1),
+    'cmd+0': () => zoom(0),
   };
 }
 

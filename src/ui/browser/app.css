@@ -3,6 +3,15 @@
 @import '../lib/buttons.css';
 
 @theme {
+  --animate-dl-slide: dl-slide 1.2s ease-in-out infinite;
+  @keyframes dl-slide {
+    from {
+      left: -30%;
+    }
+    to {
+      left: 100%;
+    }
+  }
   --animate-dl-spin: dl-spin 1s linear infinite;
   @keyframes dl-spin {
     from {
@@ -35,11 +44,22 @@
   filter: grayscale(1) opacity(0.6);
 }
 
+/* The tabs' pages: native WebKit views laid over these tags (src/ui/browser/PageViews.svelte). */
+.page-view {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--color-bg);
+}
+
 /* macOS: the tab strip is the title bar. Empty space in the top bars drags the window; anything
-   clickable opts out. */
+   clickable opts out. Electrobun reads the region from --electrobun-app-region (its own copy of
+   these rules would be an inline style, which the page's CSP blocks). */
 .platform-darwin .app-drag {
   -webkit-app-region: drag;
+  --electrobun-app-region: drag;
 }
 .platform-darwin .app-no-drag {
   -webkit-app-region: no-drag;
+  --electrobun-app-region: no-drag;
 }

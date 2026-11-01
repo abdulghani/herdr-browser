@@ -1,6 +1,6 @@
 <script>
   // Find in page, under the toolbar (and the notice bar) while it is open for the tab.
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   let { find, tabId } = $props();
   const herdr = window.herdr;
@@ -20,10 +20,13 @@
     });
   });
 
-  const count = $derived(find?.text ? `${find.active}/${find.total}` : '');
+  // WebKit highlights the matches but doesn't say which one is selected, so only the total shows.
+  const count = $derived(find?.text ? `${find.total} found` : '');
   const none = $derived(!!find?.text && !find.total);
 
-  herdr.on('focus-find', () => {
+  // The state that opens the bar can come in the same batch as this, so let the page update first.
+  herdr.on('focus-find', async () => {
+    await tick();
     input.focus();
     input.select();
   });

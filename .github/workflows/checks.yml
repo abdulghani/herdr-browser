@@ -37,9 +37,6 @@ jobs:
       - name: Install
         if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci
-        env:
-          # The checks (and the Vite build of the UI) don't need Electron itself.
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
   check:
     name: ${{ matrix.name }}
@@ -58,9 +55,10 @@ jobs:
           # Fails if coverage of src/ drops below 80% (vitest.config.mjs).
           - name: Unit tests
             run: npm run test:coverage
-          # The pages (src/ui, Svelte + Tailwind) build with Vite.
+          # The pages (src/ui, Svelte + Tailwind) build with Vite. They import Electrobun's page API
+          # (electrobun/view), which comes from the devkit `electrobun prepare` sets up in .hutch/.
           - name: Build UI
-            run: npm run build:ui
+            run: npx electrobun prepare && npm run build:ui
     steps:
       - uses: actions/checkout@v7
 

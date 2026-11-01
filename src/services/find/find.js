@@ -1,6 +1,8 @@
-// Find in page: a find bar per tab, under the toolbar.
+// Find in page: a find bar per tab, under the toolbar. WebKit finds and highlights the matches
+// (Electrobun's findInPage) but doesn't say how many there are, so the page's preload counts them
+// (window.__herdrCountMatches in src/ui/page-preload.js) and reports back ('find').
 function createFind(ctx) {
-  const finds = new Map(); // tabId -> { text, active, total } while its find bar is open
+  const finds = new Map(); // tabId -> { text, total } while its find bar is open
 
   const get = (tabId) => finds.get(tabId);
   const has = (tabId) => finds.has(tabId);
@@ -9,49 +11,49 @@ function createFind(ctx) {
   function open() {
     const tab = ctx.workspaces.activeTab();
     if (!finds.has(tab.id)) {
-      finds.set(tab.id, { text: '', active: 0, total: 0 });
-      ctx.views.layout();
+      finds.set(tab.id, { text: '', total: 0 });
       ctx.workspaces.broadcast();
     }
-    ctx.win.webContents.focus();
-    ctx.win.webContents.send('focus-find');
+    ctx.views.focusUi();
+    ctx.ui.send('focus-find');
   }
 
-  function search(text, { forward = true, findNext = false } = {}) {
+  function search(text, { forward = true } = {}) {
     const tab = ctx.workspaces.activeTab();
     const entry = finds.get(tab.id);
-    const wc = ctx.views.get(tab.id)?.webContents;
-    if (!entry || !wc) return;
+    const view = ctx.views.get(tab.id);
+    if (!entry || !view) return;
+    const changed = entry.text !== text;
     entry.text = text;
     if (text) {
-      wc.findInPage(text, { forward, findNext });
+      view.findInPage(text, { forward, matchCase: false });
+      if (changed) view.executeJavascript(`window.__herdrCountMatches?.(${JSON.stringify(text)})`);
     } else {
-      wc.stopFindInPage('clearSelection');
-      Object.assign(entry, { active: 0, total: 0 });
+      view.stopFindInPage();
+      entry.total = 0;
       ctx.workspaces.broadcast();
     }
   }
 
   function again(forward) {
     const text = finds.get(ctx.workspaces.activeTab().id)?.text;
-    if (text) search(text, { forward, findNext: true });
+    if (text) search(text, { forward });
     else open();
   }
 
   function close() {
     const tab = ctx.workspaces.activeTab();
     if (!finds.delete(tab.id)) return;
-    ctx.views.get(tab.id)?.webContents.stopFindInPage('keepSelection');
-    ctx.views.layout();
+    ctx.views.get(tab.id)?.stopFindInPage();
     ctx.workspaces.broadcast();
-    ctx.views.activeWc()?.focus();
+    ctx.views.focusContent();
   }
 
-  // The page reports how many matches there are and which one is selected.
-  function onResult(tabId, result) {
+  // The page counted the matches of what is being searched.
+  function onResult(tabId, total) {
     const find = finds.get(tabId);
-    if (!find || !result.finalUpdate) return;
-    Object.assign(find, { active: result.activeMatchOrdinal, total: result.matches });
+    if (!find) return;
+    find.total = Math.max(0, Number(total) || 0);
     ctx.workspaces.broadcast();
   }
 

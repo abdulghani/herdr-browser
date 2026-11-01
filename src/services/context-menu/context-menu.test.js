@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { m, start, useMain, wc, ws } from '../../testing/main-harness.js';
+import { m, start, tab, useMain, view, ws } from '../../testing/main-harness.js';
 
 useMain();
 
@@ -7,49 +7,35 @@ describe('context menu', () => {
   beforeEach(() => start());
 
   const openMenu = (params) => {
-    wc().emit('context-menu', {}, { x: 10, y: 20, ...params });
-    const menu = m.menus.at(-1);
-    expect(menu.popup).toHaveBeenCalledWith({ window: m.win() });
-    return menu.template;
+    m.pageMessage(tab().id, { type: 'context-menu', ...params });
+    return m.electrobun.ContextMenu.showContextMenu.mock.calls.at(-1)[0];
   };
-  const item = (template, label) => template.find((i) => i.label === label);
+  const item = (menu, label) => menu.find((i) => i.label === label);
 
-  it('offers link actions', () => {
-    const template = openMenu({ linkURL: 'https://link.example/' });
-    item(template, 'Copy Link Address').click();
-    expect(m.electron.clipboard.writeText).toHaveBeenCalledWith('https://link.example/');
-    item(template, 'Open Link in New Tab').click();
+  it('offers link actions for web links only', () => {
+    const menu = openMenu({ linkURL: 'https://link.example/' });
+    m.contextClick(item(menu, 'Copy Link Address').action, item(menu, 'Copy Link Address').data);
+    expect(m.electrobun.Utils.clipboardWriteText).toHaveBeenCalledWith('https://link.example/');
+    m.contextClick(item(menu, 'Open Link in New Tab').action, item(menu, 'Open Link in New Tab').data);
     expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://link.example/']);
+    expect(item(openMenu({ linkURL: 'javascript:alert(1)' }), 'Copy Link Address')).toBeUndefined();
+    expect(item(openMenu({ linkURL: 42 }), 'Copy Link Address')).toBeUndefined();
   });
 
   it('offers editing for fields and copy for selected text', () => {
-    expect(
-      openMenu({ isEditable: true })
-        .map((i) => i.role)
-        .filter(Boolean),
-    ).toEqual(['cut', 'copy', 'paste']);
-    expect(
-      openMenu({ selectionText: 'hi' })
-        .map((i) => i.role)
-        .filter(Boolean),
-    ).toEqual(['copy']);
-    expect(
-      openMenu({})
-        .map((i) => i.role)
-        .filter(Boolean),
-    ).toEqual([]);
+    const roles = (menu) => menu.map((i) => i.role).filter(Boolean);
+    expect(roles(openMenu({ isEditable: true }))).toEqual(['cut', 'copy', 'paste']);
+    expect(roles(openMenu({ selectionText: 'hi' }))).toEqual(['copy']);
+    expect(roles(openMenu({}))).toEqual([]);
+    expect(roles(m.ctx.contextMenu.show(tab().id) ?? openMenu())).toEqual([]);
   });
 
   it('navigates and inspects the page', () => {
-    const page = wc();
-    Object.assign(page, { entries: [{}, {}], activeIndex: 1 });
-    const template = openMenu({});
-    expect(item(template, 'Back').enabled).toBe(true);
-    expect(item(template, 'Forward').enabled).toBe(false);
-    for (const label of ['Back', 'Forward', 'Reload', 'Inspect']) item(template, label).click();
-    expect(page.navigationHistory.goBack).toHaveBeenCalled();
-    expect(page.navigationHistory.goForward).toHaveBeenCalled();
-    expect(page.reload).toHaveBeenCalled();
-    expect(page.inspectElement).toHaveBeenCalledWith(10, 20);
+    const page = view();
+    openMenu({});
+    for (const action of ['back', 'forward', 'reload', 'inspect', 'nope']) m.contextClick(action);
+    m.menuEvents.emit('context-menu-clicked', {});
+    expect(m.sent.filter(([c]) => c === 'page-action').map(([, p]) => p.action)).toEqual(['goBack', 'goForward', 'reload']);
+    expect(page.openDevTools).toHaveBeenCalled();
   });
 });

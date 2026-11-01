@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HOME_URL, SEARCH_URL, displayUrl, normalizeUrl } from './url.js';
+import { HOME_URL, SEARCH_URL, displayUrl, normalizeUrl, pageUrl, tabUrl } from './url.js';
 
 describe('normalizeUrl', () => {
   it('goes home for empty input', () => {
@@ -35,5 +35,19 @@ describe('displayUrl', () => {
   it('drops the scheme, www. and a trailing slash', () => {
     expect(displayUrl('https://www.github.com/')).toBe('github.com');
     expect(displayUrl('http://example.com/a/b')).toBe('example.com/a/b');
+  });
+});
+
+describe('settings page URLs', () => {
+  it('loads herdr://settings from the built page', () => {
+    expect(pageUrl('herdr://settings/')).toBe('views://ui/settings/index.html');
+    expect(pageUrl('herdr://settings')).toBe('views://ui/settings/index.html');
+    expect(pageUrl('herdr://settings/#about')).toBe('views://ui/settings/index.html#about');
+    expect(pageUrl('https://example.com/')).toBe('https://example.com/');
+  });
+
+  it('shows the built page as herdr://settings', () => {
+    expect(tabUrl('views://ui/settings/index.html#shortcuts')).toBe('herdr://settings/#shortcuts');
+    expect(tabUrl('https://example.com/')).toBe('https://example.com/');
   });
 });

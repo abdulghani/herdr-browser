@@ -1,110 +1,184 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkTextFocus, fakeElectron, runPreload } from '../testing/dom.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearSent, element, keydown, runPreload, sent } from '../testing/preload.js';
 
-afterEach(() => vi.unstubAllGlobals());
+const getUserMedia = vi.fn(async () => 'stream');
+const camera = { getUserMedia };
+Object.defineProperty(navigator, 'mediaDevices', { value: camera, configurable: true });
+const lastOf = (type) => sent.filter((m) => m.type === type).at(-1);
+const keysSent = () => sent.filter((m) => m.type === 'key');
 
-describe('page-preload.js (every web page)', () => {
-  it('gives normal pages no settings API', () => {
-    const electron = fakeElectron();
-    runPreload('src/ui/page-preload.js', electron);
-    expect(electron.contextBridge.exposeInMainWorld).not.toHaveBeenCalled();
+beforeEach(async () => {
+  document.body.innerHTML = '';
+  document.title = 'Hello';
+  await runPreload({ keys: ['ctrl+t', 'ctrl+space', 'alt+left', 'alt+shift+right', '?', 'ctrl+='] });
+  clearSent();
+});
+
+afterEach(() => vi.useRealTimers());
+
+describe('keys', () => {
+  it('passes on the listed keys and keeps them from the page', () => {
+    const pageSaw = vi.fn();
+    document.addEventListener('keydown', pageSaw);
+    const e = keydown('t', { ctrlKey: true, code: 'KeyT' });
+    expect(e.defaultPrevented).toBe(true);
+    expect(pageSaw).not.toHaveBeenCalled();
+    expect(keysSent()).toEqual([{ type: 'key', key: 't', code: 'KeyT', control: true, alt: false, meta: false, shift: false }]);
+    // Shifted punctuation names the key under it.
+    keydown('+', { ctrlKey: true, shiftKey: true });
+    expect(keysSent()).toHaveLength(1);
+    keydown('+', { ctrlKey: true });
+    expect(keysSent()).toHaveLength(2);
   });
 
-  it('gives herdr://settings the settings API', async () => {
-    vi.stubGlobal('location', { protocol: 'herdr:', host: 'settings' });
-    const electron = fakeElectron();
-    runPreload('src/ui/page-preload.js', electron);
-    const api = electron.exposed.herdrSettings;
-    await expect(api.get()).resolves.toEqual(['settings-get']);
-    await expect(api.setDns({ provider: 'system' })).resolves.toEqual(['settings-set-dns', { provider: 'system' }]);
-    await expect(api.resolve('example.com')).resolves.toEqual(['settings-resolve', 'example.com']);
+  it('leaves other keys, bare modifiers and typing with an input method to the page', () => {
+    for (const [key, options] of [
+      ['x', {}],
+      ['t', { metaKey: true }],
+      ['Control', { ctrlKey: true }],
+      ['t', { ctrlKey: true, isComposing: true }],
+    ])
+      expect(keydown(key, options).defaultPrevented).toBe(false);
+    expect(keysSent()).toEqual([]);
   });
 
-  it("doesn't give other herdr pages the settings API", () => {
-    vi.stubGlobal('location', { protocol: 'herdr:', host: 'other' });
-    const electron = fakeElectron();
-    runPreload('src/ui/page-preload.js', electron);
-    expect(electron.exposed.herdrSettings).toBeUndefined();
+  it('passes on Escape but leaves it to the page too', () => {
+    expect(keydown('Escape').defaultPrevented).toBe(false);
+    expect(keysSent()).toEqual([expect.objectContaining({ key: 'Escape' })]);
   });
 
-  it('reports when a text field has focus', () => {
-    const electron = fakeElectron();
-    runPreload('src/ui/page-preload.js', electron);
-    checkTextFocus(electron);
+  it('sends the key after Ctrl+Space to the browser, within 2 seconds', () => {
+    vi.useFakeTimers();
+    keydown(' ', { ctrlKey: true, code: 'Space' });
+    expect(keydown('c').defaultPrevented).toBe(true);
+    expect(keysSent().map((k) => k.key)).toEqual([' ', 'c']);
+    expect(keydown('c').defaultPrevented).toBe(false);
+    keydown(' ', { ctrlKey: true, code: 'Space' });
+    vi.advanceTimersByTime(2001);
+    expect(keydown('c').defaultPrevented).toBe(false);
+    expect(keydown('?', { shiftKey: true }).defaultPrevented).toBe(true);
+    // Leave no prefix armed for the next test.
+    keydown(' ', { ctrlKey: true, code: 'Space' });
+    keydown('z');
   });
 
-  describe('passkey refusal', () => {
-    // Runs the function the preload puts in the page, against a fake WebAuthn.
-    function installInPage({ capabilities = true } = {}) {
-      const electron = fakeElectron();
-      runPreload('src/ui/page-preload.js', electron);
-      const { args, func } = electron.contextBridge.executeInMainWorld.mock.calls[0][0];
-      const credentials = { get: vi.fn(async () => 'password'), create: vi.fn(async () => 'made') };
-      const PublicKeyCredential = {
-        isUserVerifyingPlatformAuthenticatorAvailable: async () => true,
-        isConditionalMediationAvailable: async () => true,
-        ...(capabilities && { getClientCapabilities: async () => ({ conditionalGet: true }) }),
-      };
-      vi.stubGlobal('navigator', { credentials });
-      vi.stubGlobal('PublicKeyCredential', PublicKeyCredential);
-      const { get, create } = credentials;
-      func(...args);
-      return { electron, credentials, PublicKeyCredential, get, create };
-    }
+  it('leaves Option+arrows to a text field', () => {
+    const input = element('<input type="text">');
+    expect(keydown('ArrowLeft', { altKey: true }, input).defaultPrevented).toBe(false);
+    expect(keydown('ArrowRight', { altKey: true, shiftKey: true }, element('<textarea></textarea>')).defaultPrevented).toBe(false);
+    const editable = element('<div></div>');
+    Object.defineProperty(editable, 'isContentEditable', { value: true });
+    expect(keydown('ArrowLeft', { altKey: true }, editable).defaultPrevented).toBe(false);
+    expect(keydown('ArrowLeft', { altKey: true }, element('<input type="checkbox">')).defaultPrevented).toBe(true);
+    expect(keydown('ArrowLeft', { altKey: true }, element('<button></button>')).defaultPrevented).toBe(true);
+  });
 
-    it('refuses passkey requests right away and says so', async () => {
-      const { electron, credentials } = installInPage();
-      await expect(credentials.get({ publicKey: {} })).rejects.toMatchObject({ name: 'NotAllowedError' });
-      await expect(credentials.create({ publicKey: {} })).rejects.toMatchObject({ name: 'NotAllowedError' });
-      expect(electron.ipcRenderer.send).toHaveBeenCalledWith('passkey-request', 'get');
-      expect(electron.ipcRenderer.send).toHaveBeenCalledWith('passkey-request', 'create');
-    });
+  it('passes nothing on before the keys are known', async () => {
+    delete window.__herdrKeys;
+    expect(keydown('t', { ctrlKey: true }).defaultPrevented).toBe(false);
+  });
 
-    it("doesn't show the bar for autofill requests", async () => {
-      const { electron, credentials } = installInPage();
-      await expect(credentials.get({ publicKey: {}, mediation: 'conditional' })).rejects.toThrow('Passkeys are not available');
-      expect(electron.ipcRenderer.send).not.toHaveBeenCalledWith('passkey-request', 'get');
-    });
+  it('runs once per page', async () => {
+    await import('./page-preload.js?again');
+    window.__herdrKeys = ['ctrl+t'];
+    keydown('t', { ctrlKey: true });
+    expect(keysSent()).toHaveLength(1);
+  });
+});
 
-    it('lets other credential requests through', async () => {
-      const { credentials, get, create } = installInPage();
-      await expect(credentials.get({ password: true })).resolves.toBe('password');
-      await expect(credentials.create()).resolves.toBe('made');
-      expect(get).toHaveBeenCalledWith({ password: true });
-      expect(create).toHaveBeenCalledWith(undefined);
-      expect(credentials.get.name).toBe('get');
-    });
+describe('right-click', () => {
+  const rightClick = (target) => {
+    const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    target.dispatchEvent(e);
+    return e;
+  };
 
-    it('reports no platform passkeys', async () => {
-      const { PublicKeyCredential } = installInPage();
-      await expect(PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()).resolves.toBe(false);
-      await expect(PublicKeyCredential.isConditionalMediationAvailable()).resolves.toBe(false);
-      await expect(PublicKeyCredential.getClientCapabilities()).resolves.toEqual({
-        conditionalGet: false,
-        conditionalCreate: false,
-        hybridTransport: false,
-        passkeyPlatformAuthenticator: false,
-        userVerifyingPlatformAuthenticator: false,
-      });
+  it("replaces WebKit's menu with the browser's, saying what was clicked", () => {
+    const link = element('<a href="https://link.example/"><b>go</b></a>');
+    expect(rightClick(link.firstChild).defaultPrevented).toBe(true);
+    expect(lastOf('context-menu')).toEqual({
+      type: 'context-menu',
+      linkURL: 'https://link.example/',
+      selectionText: '',
+      isEditable: false,
     });
+    rightClick(element('<input>'));
+    expect(lastOf('context-menu')).toMatchObject({ linkURL: '', isEditable: true });
+  });
 
-    it('leaves getClientCapabilities out where the browser has none', () => {
-      const { PublicKeyCredential } = installInPage({ capabilities: false });
-      expect(PublicKeyCredential.getClientCapabilities).toBeUndefined();
-    });
+  it("leaves a page's own menu alone", () => {
+    const div = element('<div></div>');
+    div.addEventListener('contextmenu', (e) => e.preventDefault());
+    rightClick(div);
+    expect(lastOf('context-menu')).toBeUndefined();
+  });
+});
 
-    it('does nothing without WebAuthn', () => {
-      const electron = fakeElectron();
-      runPreload('src/ui/page-preload.js', electron);
-      const { args, func } = electron.contextBridge.executeInMainWorld.mock.calls[0][0];
-      vi.stubGlobal('navigator', {});
-      expect(() => func(...args)).not.toThrow();
-      const credentials = { get: vi.fn() };
-      vi.stubGlobal('navigator', { credentials });
-      vi.stubGlobal('PublicKeyCredential', undefined);
-      func(...args);
-      expect(vi.isMockFunction(credentials.get)).toBe(true);
-    });
+describe('the page', () => {
+  it('reports the title and favicon when they change', async () => {
+    document.head.innerHTML = '';
+    document.title = 'Hello';
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(lastOf('title')).toEqual({ type: 'title', title: 'Hello' });
+    expect(lastOf('favicon')).toEqual({ type: 'favicon', url: `${location.origin}/favicon.ico` });
+    const count = sent.length;
+    document.dispatchEvent(new Event('readystatechange'));
+    expect(sent).toHaveLength(count);
+
+    document.title = 'Changed';
+    element('<span></span>');
+    document.head.insertAdjacentHTML('beforeend', '<link rel="Shortcut Icon" href="/icon.png">');
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(lastOf('title').title).toBe('Changed');
+    expect(lastOf('favicon').url).toBe(`${location.origin}/icon.png`);
+  });
+
+  it('reports the page again when Back brings it back from the cache', () => {
+    const count = sent.length;
+    window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: false }));
+    expect(sent).toHaveLength(count);
+    window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
+    expect(sent.slice(count).map((m) => m.type)).toEqual(['title', 'favicon']);
+  });
+
+  it('says when it is clicked', () => {
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(lastOf('focus')).toEqual({ type: 'focus' });
+  });
+
+  it('counts the matches for find in page', () => {
+    document.body.innerHTML = '<p>Cat cat CAT dog</p>';
+    Object.defineProperty(document.body, 'innerText', { value: document.body.textContent, configurable: true });
+    window.__herdrCountMatches('cat');
+    expect(lastOf('find')).toEqual({ type: 'find', total: 3 });
+    window.__herdrCountMatches('');
+    expect(lastOf('find').total).toBe(0);
+  });
+
+  it('gives only the settings page the settings API', () => {
+    expect(window.herdrSettings).toBeUndefined();
+  });
+});
+
+describe('sound and camera', () => {
+  it('says when something plays, until it all stops', () => {
+    const a = element('<audio></audio>');
+    const b = element('<video></video>');
+    a.dispatchEvent(new Event('play'));
+    b.dispatchEvent(new Event('play'));
+    expect(sent.filter((m) => m.type === 'media')).toEqual([{ type: 'media', active: true }]);
+    a.dispatchEvent(new Event('pause'));
+    a.dispatchEvent(new Event('ended'));
+    expect(lastOf('media').active).toBe(true);
+    b.dispatchEvent(new Event('emptied'));
+    expect(lastOf('media').active).toBe(false);
+  });
+
+  // (Last: the page then stays in a call.)
+  it('keeps a page that used the camera awake', async () => {
+    expect(await navigator.mediaDevices.getUserMedia({ video: true })).toBe('stream');
+    expect(getUserMedia).toHaveBeenCalledWith({ video: true });
+    expect(lastOf('media')).toEqual({ type: 'media', active: true });
   });
 });

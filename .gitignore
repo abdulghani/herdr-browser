@@ -2,3 +2,8 @@ node_modules/
 dist/
 dist-ui/
 coverage/
+# Electrobun's devkit and toolchain, set up by `electrobun dev` / `electrobun build` (Hutch).
+.hutch/
+.cottontail-tmp/
+# Made from build/icon.png by scripts/make-iconset.sh.
+build/icon.iconset/

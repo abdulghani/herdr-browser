@@ -1,67 +1,92 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { m, start, state, tab, useMain, wc, ws } from '../../testing/main-harness.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { m, start, state, tab, useMain, view, ws } from '../../testing/main-harness.js';
 
 useMain();
 
-describe('page events', () => {
+describe('page views', () => {
   beforeEach(() => start());
 
-  it('tracks the title, favicon and URL', () => {
-    wc().url = 'https://example.com/';
-    wc().title = 'Example';
-    wc().emit('did-navigate', {}, 'https://example.com/');
-    wc().emit('page-title-updated', {}, 'Example Domain');
-    wc().emit('page-favicon-updated', {}, ['https://example.com/favicon.ico']);
-    expect(tab()).toMatchObject({ url: 'https://example.com/', title: 'Example Domain', favicon: 'https://example.com/favicon.ico' });
-    expect(m.win().setTitle).toHaveBeenLastCalledWith('Example Domain — main');
-
-    wc().emit('page-favicon-updated', {}, []);
-    wc().emit('page-title-updated', {}, 'about:blank');
-    expect(tab()).toMatchObject({ title: 'New Tab', favicon: null });
-  });
-
-  it('follows in-page navigation of the main frame only', () => {
-    wc().emit('did-navigate-in-page', {}, 'https://example.com/#a', false);
-    expect(tab().url).toBe('about:blank');
-    wc().emit('did-navigate-in-page', {}, 'https://example.com/#b', true);
+  it('follows the URL and keeps the title and favicon until the page reports new ones', () => {
+    m.pageMessage(tab().id, { type: 'favicon', url: 'https://old.example/favicon.ico' });
+    view().fire('did-navigate', 'https://example.com/');
+    expect(tab()).toMatchObject({ url: 'https://example.com/', favicon: null });
+    view().fire('did-navigate-in-page', 'https://example.com/#b');
     expect(tab().url).toBe('https://example.com/#b');
-  });
-
-  it('paints blank and herdr pages dark, others white', () => {
-    const view = m.shownView();
-    view.webContents.emit('did-start-navigation', { isMainFrame: true, url: 'https://example.com/' });
-    expect(view.background).toBe('#ffffff');
-    view.webContents.emit('did-start-navigation', { isMainFrame: true, url: 'herdr://settings/' });
-    expect(view.background).toBe('#0b0d10');
-    view.webContents.emit('did-start-navigation', { isMainFrame: false, url: 'https://ads.example/' });
-    expect(view.background).toBe('#0b0d10');
+    view().fire('did-navigate', 'views://ui/settings/index.html#about');
+    expect(tab().url).toBe('herdr://settings/#about');
+    view().fire('did-navigate');
+    expect(tab().url).toBe('');
   });
 
   it('reports loading', () => {
-    wc().loading = true;
-    wc().emit('did-start-loading');
-    expect(state().nav.loading).toBe(true);
-    wc().loading = false;
-    wc().emit('did-stop-loading');
-    expect(state().nav.loading).toBe(false);
+    expect(state().loading).toBe(true);
+    view().fire('dom-ready', 'about:blank');
+    expect(state().loading).toBe(false);
+    view().fire('will-navigate', 'https://example.com/');
+    expect(state().loading).toBe(true);
+    view().fire('load-finished');
+    expect(state().loading).toBe(false);
+    view().fire('load-started');
+    view().fire('download-started', { filename: 'a.zip', path: '/tmp/a.zip' });
+    expect(state().loading).toBe(false);
   });
 
-  it('opens popups as a new tab next to the opener', () => {
+  it('opens popups and Cmd+clicked links as a new tab next to the opener', () => {
     m.cmd('newTab');
     m.cmd('selectTab', ws().tabs[0].id);
-    const result = wc().windowOpenHandler({ url: 'https://popup.example/' });
-    expect(result).toEqual({ action: 'deny' });
-    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://popup.example/', 'about:blank']);
+    const opener = view();
+    opener.fire('new-window-open', { url: 'https://popup.example/', isCmdClick: false });
+    opener.fire('new-window-open', 'https://string.example/');
+    opener.fire('new-window-open', {});
+    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://string.example/', 'https://popup.example/', 'about:blank']);
     expect(ws().activeTab).toBe(1);
   });
 
-  it('ignores events from a tab that was closed', () => {
-    const first = m.shownView().webContents;
+  it('ignores events from a tab that was closed or a view it no longer has', () => {
+    const first = view();
+    const firstId = tab().id;
     m.cmd('newTab');
-    m.cmd('closeTab', ws().tabs[0].id);
-    first.emit('page-title-updated', {}, 'Gone');
-    expect(ws().tabs.map((t) => t.title)).toEqual(['New Tab']);
-    expect(first.windowOpenHandler({ url: 'https://x.example/' })).toEqual({ action: 'deny' });
-    expect(ws().tabs).toHaveLength(1);
+    m.cmd('closeTab', firstId);
+    first.fire('did-navigate', 'https://gone.example/');
+    first.fire('host-message', { type: 'title', title: 'Gone' });
+    first.fire('new-window-open', 'https://x.example/');
+    first.fire('dom-ready');
+    expect(ws().tabs.map((t) => [t.url, t.title])).toEqual([['about:blank', 'New Tab']]);
+  });
+
+  it('only takes a view for an awake tab that exists', () => {
+    const { tabView } = m.handlers().messages;
+    tabView({ tabId: 'nope', webviewId: view().id });
+    tabView({ tabId: tab().id, webviewId: 999 });
+    expect(state().awake).toEqual([tab().id]);
+  });
+
+  it('runs page actions and zoom on the shown page only', () => {
+    m.cmd('stop');
+    expect(view().executeJavascript).toHaveBeenCalledWith('window.stop()');
+    m.ui.auto = false;
+    m.cmd('newTab');
+    m.cmd('stop');
+    m.cmd('back');
+    expect(m.sent.filter(([c]) => c === 'page-action')).toHaveLength(0);
+  });
+
+  it('wakes a sleeping tab with a notice that its history is gone', () => {
+    m.cmd('navigate', 'a.com');
+    view().fire('dom-ready');
+    const sleeper = tab().id;
+    m.cmd('newTab');
+    vi.advanceTimersByTime(11 * 60 * 1000);
+    expect(state().awake).toEqual([tab().id]);
+    m.cmd('selectTab', sleeper);
+    expect(tab().notice).toEqual({ kind: 'woke' });
+    // Loading its page again keeps the notice; leaving the page drops it.
+    view().fire('did-navigate', 'https://a.com/');
+    expect(tab().notice).toEqual({ kind: 'woke' });
+    view().fire('did-navigate', 'https://b.com/');
+    expect(tab().notice).toBeUndefined();
+    m.cmd('selectTab', ws().tabs[1].id);
+    m.cmd('selectTab', sleeper);
+    expect(tab().notice).toBeUndefined();
   });
 });

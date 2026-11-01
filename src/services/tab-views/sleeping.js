@@ -1,24 +1,16 @@
 // Background tabs not looked at for a while are unloaded to free memory (like Chrome's Memory
-// Saver) and reload, with their back/forward history, when selected again.
+// Saver) and load their page again when selected. WebKit gives no way to save a view's
+// back/forward history, so a tab that slept comes back with only its current page.
 const SLEEP_AFTER_MS = 10 * 60 * 1000;
 const CHECK_EVERY_MS = 30 * 1000;
 
 function createSleeping(ctx) {
   const hiddenSince = new Map(); // tabId -> when its loaded view was last hidden
-  const sleptHistory = new Map(); // tabId -> back/forward history to restore on wake
-  const mediaTabs = new Set(); // tabs that asked for camera/mic on their current page
+  const mediaTabs = new Set(); // tabs whose page uses the camera or mic, or plays sound
+  const slept = new Set(); // tabs put to sleep, until they are shown again
 
-  // Back/forward history for a tab without a view (asleep, restored or reopened).
-  const keepHistory = (tabId, history) => sleptHistory.set(tabId, history);
-  const keptHistory = (tabId) => sleptHistory.get(tabId);
-  const forget = (tabId) => sleptHistory.delete(tabId);
-  function takeHistory(tabId) {
-    const history = sleptHistory.get(tabId);
-    sleptHistory.delete(tabId);
-    return history;
-  }
-
-  const noteMedia = (tabId) => mediaTabs.add(tabId);
+  // The page's preload reports these (src/ui/page-preload.js).
+  const setMedia = (tabId, active) => (active ? mediaTabs.add(tabId) : mediaTabs.delete(tabId));
   const clearMedia = (tabId) => mediaTabs.delete(tabId);
 
   function viewGone(tabId) {
@@ -26,37 +18,32 @@ function createSleeping(ctx) {
     mediaTabs.delete(tabId);
   }
 
-  // Tabs in a call, playing sound, or still loading stay awake.
-  function canSleep(tabId) {
-    const wc = ctx.views.get(tabId).webContents;
-    return !mediaTabs.has(tabId) && !wc.isCurrentlyAudible() && !wc.isLoading() && !wc.isCrashed();
-  }
+  // Asked once when a tab is shown: did it sleep since it was last seen?
+  const woke = (tabId) => slept.delete(tabId);
 
-  function sleepTab(tabId) {
-    const nav = ctx.views.get(tabId).webContents.navigationHistory;
-    sleptHistory.set(tabId, { entries: nav.getAllEntries(), index: nav.getActiveIndex() });
-    ctx.views.destroy(tabId);
-  }
+  // Tabs in a call, playing sound, or still loading stay awake.
+  const canSleep = (tabId) => !mediaTabs.has(tabId) && !ctx.views.isLoading(tabId);
 
   function sleepIdleTabs() {
     const now = Date.now();
-    let slept = false;
+    let changed = false;
     for (const tabId of ctx.views.awake()) {
       if (tabId === ctx.views.shown()) {
         hiddenSince.delete(tabId);
       } else if (!hiddenSince.has(tabId)) {
         hiddenSince.set(tabId, now);
       } else if (now - hiddenSince.get(tabId) >= SLEEP_AFTER_MS && canSleep(tabId)) {
-        sleepTab(tabId);
-        slept = true;
+        ctx.views.destroy(tabId);
+        slept.add(tabId);
+        changed = true;
       }
     }
-    if (slept) ctx.workspaces.broadcast();
+    if (changed) ctx.workspaces.broadcast();
   }
 
   const start = () => setInterval(sleepIdleTabs, CHECK_EVERY_MS);
 
-  return { keepHistory, keptHistory, takeHistory, forget, noteMedia, clearMedia, viewGone, start };
+  return { setMedia, clearMedia, viewGone, woke, forget: (tabId) => slept.delete(tabId), start };
 }
 
 module.exports = { createSleeping };

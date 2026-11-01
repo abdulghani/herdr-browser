@@ -1,3 +1,7 @@
+# Releases are made from main only, which is the Electron build. The electrobun branch (the
+# Electrobun / native WebKit experiment) is never released: this workflow only runs for pull
+# requests merged into main and by hand.
+#
 # When a pull request that changes the app's source (src/) or CHANGELOG.md is merged into main,
 # bump the version, add the merged pull requests to CHANGELOG.md, build the Mac and Linux apps
 # and publish them as a GitHub release. Nothing is released unless src/ (apart from tests) or

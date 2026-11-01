@@ -1,23 +1,20 @@
-// What the browser UI (src/ui/browser) asks the main process to do: herdr.cmd(name, arg) in the
-// page arrives here as the 'cmd' message.
-const { ipcMain } = require('electron');
+// What the browser UI (src/ui/browser) asks the main process to do, over Electrobun's RPC between
+// the Bun process and the window's webview. herdr.cmd(name, arg) in the page arrives here as the
+// 'cmd' message; see src/ui/lib/bridge.js for the page's side.
 
 function commands(ctx) {
   const ws = () => ctx.workspaces;
-  const page = () => ctx.views.activeWc();
+  const views = () => ctx.views;
   return {
-    showSuggestions: (payload) => ctx.suggestions.show(payload),
-    hideSuggestions: () => ctx.suggestions.hide(),
-    selectSuggestion: (index) => ctx.suggestions.select(index),
     switchToTab: (tabId) => ws().selectTabById(tabId),
     find: (text) => ctx.find.search(text),
     findNext: (forward) => ctx.find.again(forward),
     closeFind: () => ctx.find.close(),
-    navigate: (text) => ctx.views.navigate(text),
-    back: () => page()?.navigationHistory.goBack(),
-    forward: () => page()?.navigationHistory.goForward(),
-    reload: () => page()?.reload(),
-    stop: () => page()?.stop(),
+    navigate: (text) => views().navigate(text),
+    back: () => views().pageAction('goBack'),
+    forward: () => views().pageAction('goForward'),
+    reload: () => views().pageAction('reload'),
+    stop: () => views().runInPage('window.stop()'),
     newTab: () => ws().openTab(),
     openSettings: () => ws().openSettings(),
     closeTab: (tabId) => ws().closeTab(tabId),
@@ -30,20 +27,33 @@ function commands(ctx) {
     moveTabTo: (arg) => ws().moveTabTo(arg),
     moveWorkspaceTo: (arg) => ws().moveWorkspaceTo(arg),
     toggleSidebar: () => ws().toggleSidebar(),
-    dismissNotice: () => ctx.passkeys.dismiss(),
-    openExternally: () => ctx.passkeys.openExternally(),
-    focusContent: () => ctx.views.focusContent(),
-    toggleDownloads: (rect) => ctx.downloads.toggle(rect),
-    showDownloads: (rect) => ctx.downloads.show(rect),
+    dismissNotice: () => ctx.pages.setNotice(ws().activeTab().id, null),
+    focusContent: () => views().focusContent(),
+    toggleDownloads: () => ctx.downloads.toggle(),
+    showDownloads: () => ctx.downloads.show(),
     hideDownloads: () => ctx.downloads.hide(),
+    downloadsAction: ({ action, id }) => ctx.downloads.act(action, id),
+    downloadsClear: () => ctx.downloads.clear(),
+    downloadsFolder: () => ctx.downloads.openFolder(),
+    downloadsPointer: () => ctx.downloads.keepOpen(),
   };
 }
 
-function handleUiIpc(ctx) {
+// The handlers for BrowserView.defineRPC: requests answer the page, messages don't.
+function uiHandlers(ctx, onReady) {
   const COMMANDS = commands(ctx);
-  ipcMain.on('cmd', (_e, name, arg) => COMMANDS[name]?.(arg));
-  // The UI asks for the state once it has loaded.
-  ipcMain.on('ready', () => ctx.workspaces.broadcast());
+  return {
+    requests: {
+      suggest: (query) => ctx.suggestions.suggest(query),
+    },
+    messages: {
+      cmd: ({ name, arg } = {}) => COMMANDS[name]?.(arg),
+      // The UI asks for the state once it has loaded.
+      ready: () => onReady(),
+      // The UI made the native webview for a tab (<electrobun-webview>, src/ui/browser/PageViews.svelte).
+      tabView: ({ tabId, webviewId }) => ctx.views.attach(tabId, webviewId),
+    },
+  };
 }
 
-module.exports = { handleUiIpc };
+module.exports = { uiHandlers };

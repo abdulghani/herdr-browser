@@ -2,7 +2,10 @@
 import { cleanup, render } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defineFakeWebviewTag, webviewTags } from '../../testing/dom.js';
 import App from './App.svelte';
+
+defineFakeWebviewTag();
 
 let herdr;
 let listeners;
@@ -21,8 +24,12 @@ function start(platform = 'darwin') {
     ready: vi.fn(),
     suggest: vi.fn(async () => []),
     on: vi.fn((channel, fn) => (listeners[channel] = fn)),
+    tabView: vi.fn(),
   };
   window.herdr = herdr;
+  window.suggestions = { onRows: vi.fn(), onSelect: vi.fn(), hover: vi.fn(), pick: vi.fn() };
+  window.downloads = { onRows: vi.fn(), action: vi.fn(), clear: vi.fn(), openFolder: vi.fn(), pointer: vi.fn() };
+  webviewTags.nav = { canGoBack: false, canGoForward: false };
   render(App);
 }
 
@@ -48,8 +55,14 @@ function makeState(changes = {}) {
     ],
     activeWs: 0,
     awake: ['t1', 't3'],
+    pages: [
+      { id: 't1', src: 'https://example.com/' },
+      { id: 't3', src: 'https://docs.example/' },
+    ],
+    shown: 't1',
+    keys: ['ctrl+t'],
+    loading: false,
     sidebarCollapsed: false,
-    nav: { canGoBack: true, canGoForward: false, loading: false },
     prefixArmed: false,
     find: null,
     ...changes,
@@ -152,7 +165,7 @@ describe('rendering state', () => {
   });
 
   it('shows the toolbar state', () => {
-    expect($('back').disabled).toBe(false);
+    expect($('back').disabled).toBe(true);
     expect($('forward').disabled).toBe(true);
     expect($('reload').textContent).toBe('↻');
     expect($('reload').title).toBe('Reload (Ctrl+R)');
@@ -166,9 +179,7 @@ describe('rendering state', () => {
   });
 
   it('shows loading, the armed prefix and a collapsed sidebar', () => {
-    emit('state', makeState({ nav: { canGoBack: false, canGoForward: true, loading: true }, prefixArmed: true, sidebarCollapsed: true }));
-    expect($('back').disabled).toBe(true);
-    expect($('forward').disabled).toBe(false);
+    emit('state', makeState({ loading: true, prefixArmed: true, sidebarCollapsed: true }));
     expect($('reload').textContent).toBe('×');
     expect($('reload').title).toBe('Stop');
     expect($('prefix').hidden).toBe(false);
@@ -230,47 +241,45 @@ describe('macOS title bar', () => {
 });
 
 describe('notice bar', () => {
-  it('offers to open the page in another browser', () => {
+  it('says when a tab that slept lost its back/forward history', () => {
     const s = makeState();
-    s.workspaces[0].tabs[0].notice = { kind: 'passkey', browser: 'Chrome' };
+    s.workspaces[0].tabs[0].notice = { kind: 'woke' };
     emit('state', s);
     expect($('notice').hidden).toBe(false);
-    expect($('notice-text').textContent).toBe("This site wants a passkey, which doesn't work here yet.");
-    expect($('notice-text').title).toMatch(/no passkey support/);
-    expect($('notice-open').hidden).toBe(false);
-    expect($('notice-open').textContent).toBe('Open in Chrome');
+    expect($('notice-text').textContent).toMatch(/asleep to save memory/);
+    expect($('notice-text').title).toMatch(/can't keep their back\/forward history/);
   });
 
-  it('hides the open button when there is no other browser', () => {
+  it('shows nothing for a notice it does not know', () => {
     const s = makeState();
-    s.workspaces[0].tabs[0].notice = { kind: 'passkey', browser: null };
+    s.workspaces[0].tabs[0].notice = { kind: 'passkey' };
     emit('state', s);
-    expect($('notice').hidden).toBe(false);
-    expect($('notice-open').hidden).toBe(true);
+    expect($('notice').hidden).toBe(true);
   });
 });
 
 describe('find bar', () => {
   it('shows the search and match count', () => {
-    emit('state', makeState({ find: { text: 'cat', active: 2, total: 5 } }));
+    emit('state', makeState({ find: { text: 'cat', total: 5 } }));
     expect($('find').hidden).toBe(false);
     expect($('find-input').value).toBe('cat');
-    expect($('find-count').textContent).toBe('2/5');
+    expect($('find-count').textContent).toBe('5 found');
     expect($('find-count').classList.contains('none')).toBe(false);
   });
 
   it('marks no matches, and shows no count for an empty search', () => {
-    emit('state', makeState({ find: { text: 'zzz', active: 0, total: 0 } }));
-    expect($('find-count').textContent).toBe('0/0');
+    emit('state', makeState({ find: { text: 'zzz', total: 0 } }));
+    expect($('find-count').textContent).toBe('0 found');
     expect($('find-count').classList.contains('none')).toBe(true);
     emit('state', makeState({ find: { text: '', active: 0, total: 0 } }));
     expect($('find-count').textContent).toBe('');
     expect($('find-count').classList.contains('none')).toBe(false);
   });
 
-  it("doesn't overwrite what is typed, unless the tab changes", () => {
+  it("doesn't overwrite what is typed, unless the tab changes", async () => {
     emit('state', makeState({ find: { text: 'ca', active: 0, total: 0 } }));
     emit('focus-find');
+    await flush();
     expect(document.activeElement).toBe($('find-input'));
     typeInto($('find-input'), 'cat');
     emit('state', makeState({ find: { text: 'ca', active: 1, total: 1 } }));
@@ -297,7 +306,15 @@ describe('find bar', () => {
 });
 
 describe('buttons and clicks', () => {
-  beforeEach(() => emit('state', makeState({ nav: { canGoBack: true, canGoForward: true, loading: false } })));
+  beforeEach(async () => {
+    webviewTags.nav = { canGoBack: true, canGoForward: true };
+    const s = makeState();
+    s.workspaces[0].tabs[0].notice = { kind: 'woke' };
+    emit('state', s);
+    // The tags get their views, then the back and forward answers come.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await flush();
+  });
 
   it.each([
     ['new-ws', 'newWorkspace'],
@@ -308,7 +325,6 @@ describe('buttons and clicks', () => {
     ['sidebar-toggle', 'toggleSidebar'],
     ['settings', 'openSettings'],
     ['collapse', 'toggleSidebar'],
-    ['notice-open', 'openExternally'],
     ['notice-dismiss', 'dismissNotice'],
     ['find-close', 'closeFind'],
   ])('%s sends %s', (id, name) => {
@@ -575,16 +591,16 @@ describe('inline rename', () => {
     mouse(input, 'dblclick');
     expect(commands()).toEqual([]);
     // State updates wait until the rename is done.
-    emit('state', makeState({ nav: { canGoBack: false, canGoForward: false, loading: false } }));
+    emit('state', makeState({ loading: true }));
     expect(renameInput()).toBe(input);
-    expect($('back').disabled).toBe(false);
+    expect($('reload').textContent).toBe('↻');
 
     input.value = 'Mine';
     key(input, 'Enter');
     expect(commands()).toEqual([['renameTab', { id: 't1', name: 'Mine' }], ['focusContent']]);
     expect(renameInput()).toBeNull();
     // Then the newest state shows.
-    expect($('back').disabled).toBe(true);
+    expect($('reload').textContent).toBe('×');
     fire(input, new FocusEvent('blur'));
     expect(commands()).toHaveLength(2);
   });
@@ -775,30 +791,28 @@ describe('download button', () => {
     expect(ring()).toBe('50 100');
   });
 
-  it('toggles the panel under the button', () => {
+  it('toggles the panel from the button', () => {
     emit('state', makeState({ downloads: downloads() }));
-    placeAt('downloads', 1300);
     click(button());
-    expect(herdr.cmd).toHaveBeenLastCalledWith('toggleDownloads', { x: 1300, y: 70, width: 28 });
-    emit('show-downloads');
-    expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', { x: 1300, y: 70, width: 28 });
+    expect(herdr.cmd).toHaveBeenLastCalledWith('toggleDownloads', expect.any(Object));
   });
 
-  it('places the panel under settings while there is no button', () => {
-    emit('state', makeState());
-    placeAt('settings', 1340);
-    emit('show-downloads');
-    expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', { x: 1340, y: 70, width: 28 });
-  });
-
-  it('moves the open panel along when the window resizes', () => {
-    fire(window, new Event('resize'));
+  it('draws the open panel over the page, under the button, kept inside the window', () => {
     emit('state', makeState({ downloads: downloads() }));
-    fire(window, new Event('resize'));
-    expect(herdr.cmd).not.toHaveBeenCalled();
+    const overlay = $('downloads-overlay');
+    expect(overlay.hidden).toBe(true);
+    placeAt('downloads', 1300);
+    window.innerWidth = 1400;
     emit('downloads', downloads({ open: true }));
+    expect(overlay.hidden).toBe(false);
+    expect([overlay.style.left, overlay.style.top]).toEqual([`${1328 - 360}px`, '74px']);
+    // While there is no button, under settings; never past the window's edges.
+    emit('state', makeState({ downloads: downloads({ any: false, open: true }) }));
+    placeAt('settings', 0);
     fire(window, new Event('resize'));
-    expect(herdr.cmd).toHaveBeenLastCalledWith('showDownloads', expect.any(Object));
+    expect(overlay.style.left).toBe('8px');
+    emit('downloads', downloads({ open: false }));
+    expect(overlay.hidden).toBe(true);
   });
 
   it('names the other keys elsewhere', () => {
@@ -813,5 +827,100 @@ describe('other platforms', () => {
     start('linux');
     expect(root().classList.contains('platform-linux')).toBe(true);
     expect(root().classList.contains('platform-darwin')).toBe(false);
+  });
+});
+
+describe('page views', () => {
+  const tags = () => [...document.querySelectorAll('electrobun-webview')];
+  const tagOf = (tabId) => document.querySelector(`electrobun-webview[data-tab="${tabId}"]`);
+  const ready = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await flush();
+  };
+
+  it('makes a native view for each tab with a page, with the preload, and reports it', async () => {
+    emit('state', makeState());
+    expect(tags().map((t) => t.dataset.tab)).toEqual(['t1', 't3']);
+    const tag = tagOf('t1');
+    expect(tag.getAttribute('src')).toBe('https://example.com/');
+    expect(tag.hasAttribute('sandbox')).toBe(true);
+    expect(tag.getAttribute('renderer')).toBe('native');
+    expect(tag.getAttribute('masks')).toBe('#suggestions-overlay,#downloads-overlay');
+    expect(tag.getAttribute('preload')).toMatch(/^window\.__herdrKeys=\["ctrl\+t"\];\n/);
+    expect(tag.getAttribute('preload')).toContain('__electrobunSendToHost');
+    await ready();
+    expect(herdr.tabView.mock.calls.map(([tabId]) => tabId)).toEqual(['t1', 't3']);
+    // Only the shown tab's view is visible, and it takes the clicks.
+    expect(tagOf('t3').toggleHidden).toHaveBeenCalledWith(true);
+    expect(tagOf('t3').togglePassthrough).toHaveBeenCalledWith(true);
+    expect(tagOf('t1').toggleHidden).not.toHaveBeenCalled();
+
+    emit('state', makeState({ shown: 't3' }));
+    expect(tagOf('t1').toggleHidden).toHaveBeenLastCalledWith(true);
+    expect(tagOf('t3').toggleHidden).toHaveBeenLastCalledWith(false);
+  });
+
+  it('removes the view of a tab that slept or closed, and keeps the others as they are', async () => {
+    emit('state', makeState());
+    const first = tagOf('t1');
+    emit('state', makeState({ pages: [{ id: 't1', src: 'https://elsewhere.example/' }] }));
+    expect(tags()).toEqual([first]);
+    expect(first.getAttribute('src')).toBe('https://example.com/');
+    emit('state', makeState({ pages: undefined, shown: null }));
+    expect(tags()).toEqual([]);
+    await ready();
+    expect(herdr.tabView).not.toHaveBeenCalled();
+  });
+
+  it('asks the shown view whether it can go back or forward as it navigates', async () => {
+    webviewTags.nav = { canGoBack: true, canGoForward: false };
+    emit('state', makeState());
+    await ready();
+    expect($('back').disabled).toBe(false);
+    webviewTags.nav = { canGoBack: false, canGoForward: true };
+    tagOf('t1').fire('did-navigate', 'https://example.com/next');
+    await flush();
+    expect([$('back').disabled, $('forward').disabled]).toEqual([true, false]);
+    // A hidden tab's navigation doesn't count.
+    webviewTags.nav = { canGoBack: true, canGoForward: true };
+    tagOf('t3').fire('did-navigate-in-page', 'https://docs.example/#x');
+    await flush();
+    expect($('back').disabled).toBe(true);
+    emit('state', makeState({ shown: 'gone' }));
+    expect($('forward').disabled).toBe(true);
+  });
+
+  it('shows a blank tab see-through, until it goes somewhere', async () => {
+    emit('state', makeState({ pages: [{ id: 't2', src: 'about:blank' }], shown: 't2' }));
+    const tag = tagOf('t2');
+    expect(tag.hasAttribute('transparent')).toBe(true);
+    tag.fire('did-navigate', 'https://example.com/');
+    expect(tag.toggleTransparent).toHaveBeenLastCalledWith(false);
+    tag.fire('did-navigate', 'https://example.com/b');
+    expect(tag.toggleTransparent).toHaveBeenCalledTimes(1);
+    tag.fire('did-navigate', 'about:blank');
+    expect(tag.toggleTransparent).toHaveBeenLastCalledWith(true);
+  });
+
+  it('goes back, forward and reloads when main asks, and nothing else', () => {
+    emit('state', makeState());
+    emit('page-action', { tabId: 't1', action: 'goBack' });
+    emit('page-action', { tabId: 't1', action: 'reload' });
+    emit('page-action', { tabId: 't1', action: 'remove' });
+    emit('page-action', { tabId: 'nope', action: 'goBack' });
+    expect(tagOf('t1').goBack).toHaveBeenCalled();
+    expect(tagOf('t1').reload).toHaveBeenCalled();
+    expect(tags()).toHaveLength(2);
+  });
+
+  it('cuts the holes again when an overlay opens or closes', () => {
+    emit('state', makeState());
+    emit('suggest-overlay', { x: 10.4, y: 70.6, width: 300, height: 74 });
+    const overlay = $('suggestions-overlay');
+    expect(overlay.hidden).toBe(false);
+    expect([overlay.style.left, overlay.style.top, overlay.style.width, overlay.style.height]).toEqual(['10px', '71px', '300px', '74px']);
+    expect(tagOf('t1').syncDimensions).toHaveBeenCalledWith(true);
+    emit('suggest-overlay', null);
+    expect(overlay.hidden).toBe(true);
   });
 });

@@ -1,29 +1,25 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { press } from '../../testing/fake-electron.js';
-import { m, start, state, ui, useMain, wc, ws } from '../../testing/main-harness.js';
+import { m, press, start, state, useMain, ws } from '../../testing/main-harness.js';
 
 useMain();
 
 describe('reopening closed tabs', () => {
   beforeEach(() => start());
 
-  it('reopens a closed tab where it was, with its history', () => {
+  it('reopens a closed tab where it was', () => {
     m.cmd('navigate', 'a.com');
     m.cmd('newTab');
     m.cmd('navigate', 'b.com');
-    const entries = [{ url: 'https://x.com/' }, { url: 'https://b.com/' }];
-    Object.assign(wc(), { entries, activeIndex: 1 });
     m.cmd('closeTab');
-    press(ui(), 'cmd+shift+t');
+    press('cmd+shift+t');
     expect(ws().tabs.map((t) => t.url)).toEqual(['https://a.com', 'https://b.com']);
     expect(ws().activeTab).toBe(1);
-    expect(wc().navigationHistory.restore).toHaveBeenCalledWith({ entries, index: 1 });
   });
 
   it('does not remember blank tabs', () => {
     m.cmd('newTab');
     m.cmd('closeTab');
-    press(ui(), 'cmd+shift+t');
+    press('cmd+shift+t');
     expect(ws().tabs).toHaveLength(1);
   });
 
@@ -35,7 +31,7 @@ describe('reopening closed tabs', () => {
     m.cmd('selectWorkspace', state().workspaces[0].id);
     m.cmd('closeWorkspace', state().workspaces[1].id);
     expect(state().workspaces).toHaveLength(1);
-    press(ui(), 'cmd+shift+t');
+    press('cmd+shift+t');
     expect(state().workspaces.map((w) => w.name)).toEqual(['main', 'docs']);
     expect(state().activeWs).toBe(1);
     expect(ws().tabs.map((t) => t.url)).toEqual(['https://docs.example', 'about:blank']);
@@ -50,7 +46,7 @@ describe('reopening closed tabs', () => {
     m.cmd('closeTab');
     // Only a blank tab is left, so closing the workspace is not remembered.
     m.cmd('closeWorkspace');
-    press(ui(), 'cmd+shift+t');
+    press('cmd+shift+t');
     expect(state().workspaces.map((w) => w.name)).toEqual(['main']);
     expect(ws().tabs.map((t) => t.url)).toEqual(['https://a.com', 'about:blank']);
   });
@@ -61,7 +57,7 @@ describe('reopening closed tabs', () => {
       m.cmd('navigate', `site${i}.com`);
       m.cmd('closeTab');
     }
-    for (let i = 0; i < 30; i++) press(ui(), 'cmd+shift+t');
+    for (let i = 0; i < 30; i++) press('cmd+shift+t');
     expect(ws().tabs).toHaveLength(26);
   });
 });

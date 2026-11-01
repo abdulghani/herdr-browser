@@ -4,23 +4,22 @@ import prettier from 'eslint-config-prettier';
 import svelte from 'eslint-plugin-svelte';
 
 export default [
-  { ignores: ['dist/', 'dist-ui/', 'node_modules/', 'coverage/'] },
+  { ignores: ['dist/', 'dist-ui/', 'node_modules/', 'coverage/', '.hutch/', '.cottontail-tmp/'] },
   js.configs.recommended,
   ...svelte.configs.recommended,
-  // Main process: the entry point, its services and shared functions.
+  // Main process (run by Bun): the entry point, its services and shared functions.
   {
     files: ['src/*.js', 'src/services/**/*.js', 'src/lib/**/*.js'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
   },
-  // Preloads run in the page with Node's require.
+  // The preload every page gets: a plain script, injected as text.
   {
-    files: ['src/ui/**/preload.js', 'src/ui/page-preload.js'],
-    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
+    files: ['src/ui/page-preload.js'],
+    languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
   },
   // The pages: Svelte components and the modules next to them, built by Vite for the browser.
   {
     files: ['src/ui/**/*.svelte', 'src/ui/**/*.svelte.js', 'src/ui/**/main.js', 'src/ui/*/*.js'],
-    ignores: ['src/ui/**/preload.js'],
     languageOptions: { sourceType: 'module', globals: { ...globals.browser } },
   },
   // Tests (next to the files they test), their helpers and the config files are ES modules.
@@ -30,7 +29,7 @@ export default [
   },
   // Tests of the UI and preloads run in jsdom, which provides the browser globals.
   {
-    files: ['src/ui/**/*.test.js', 'src/testing/dom.js'],
+    files: ['src/ui/**/*.test.js', 'src/testing/dom.js', 'src/testing/preload.js', 'src/testing/fake-electroview.js'],
     languageOptions: { globals: { ...globals.browser } },
   },
   {

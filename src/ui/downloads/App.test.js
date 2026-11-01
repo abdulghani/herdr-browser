@@ -28,11 +28,9 @@ const row = (changes) => ({
   id: 1,
   filename: 'report.pdf',
   state: 'progressing',
-  paused: false,
   removed: false,
-  canResume: false,
   progress: 0.25,
-  status: '1 MB of 4 MB',
+  status: '25%',
   ...changes,
 });
 
@@ -47,23 +45,19 @@ describe('downloads panel', () => {
     showRows([row()]);
     const [item] = items();
     expect(item.querySelector('.dl-name').textContent).toBe('report.pdf');
-    expect(item.querySelector('.dl-status').textContent).toBe('1 MB of 4 MB');
+    expect(item.querySelector('.dl-status').textContent).toBe('25%');
     expect(item.querySelector('.dl-ext').textContent).toBe('PDF');
     expect(item.querySelector('.dl-bar-fill').style.width).toBe('25%');
     expect(item.title).toBe('report.pdf');
-    expect(buttons(item)).toEqual(['Pause', 'Cancel']);
-    // The buttons of a running download always show.
-    expect(item.querySelector('.dl-actions').classList.contains('visible')).toBe(true);
+    // WebKit's downloads can't be paused or cancelled from here.
+    expect(buttons(item)).toEqual([]);
     expect(item.classList.contains('openable')).toBe(false);
     expect(clearButton().disabled).toBe(true);
   });
 
-  it('draws a paused download, and one of unknown size', () => {
-    showRows([row({ paused: true }), row({ id: 2, filename: 'stream', progress: null })]);
-    const [paused, unsized] = items();
-    expect(buttons(paused)).toEqual(['Resume', 'Cancel']);
-    expect(paused.querySelector('.dl-bar').classList.contains('paused')).toBe(true);
-    expect(paused.querySelector('.dl-bar-fill').classList.contains('bg-muted')).toBe(true);
+  it('draws a download that has not said how far it is yet', () => {
+    showRows([row({ id: 2, filename: 'stream', progress: null })]);
+    const [unsized] = items();
     expect(unsized.querySelector('.dl-bar-fill').classList.contains('indeterminate')).toBe(true);
     expect(unsized.querySelector('.dl-ext').textContent).toBe('');
   });
@@ -79,14 +73,15 @@ describe('downloads panel', () => {
     expect(clearButton().disabled).toBe(false);
   });
 
-  it('offers a retry for stopped and deleted downloads', () => {
-    showRows([row({ state: 'cancelled' }), row({ id: 2, state: 'interrupted' }), row({ id: 3, state: 'completed', removed: true })]);
-    const [cancelled, failed, deleted] = items();
-    for (const item of [cancelled, failed, deleted]) expect(buttons(item)).toEqual(['Retry', 'Remove from list']);
+  it('only offers to remove failed and deleted downloads', () => {
+    showRows([row({ id: 2, state: 'interrupted' }), row({ id: 3, state: 'completed', removed: true })]);
+    const [failed, deleted] = items();
+    for (const item of [failed, deleted]) expect(buttons(item)).toEqual(['Remove from list']);
     expect(deleted.classList.contains('dl-removed')).toBe(true);
     expect(deleted.classList.contains('openable')).toBe(false);
     expect(failed.querySelector('.dl-status').classList.contains('text-error')).toBe(true);
-    expect(cancelled.querySelector('.dl-name').classList.contains('line-through')).toBe(true);
+    expect(failed.querySelector('.dl-name').classList.contains('line-through')).toBe(false);
+    expect(deleted.querySelector('.dl-name').classList.contains('line-through')).toBe(true);
     deleted.click();
     expect(api.action).not.toHaveBeenCalled();
   });
@@ -103,7 +98,7 @@ describe('downloads panel', () => {
     showRows([row({ state: 'completed' })]);
     clearButton().click();
     document.getElementById('dl-folder').click();
-    document.body.dispatchEvent(new MouseEvent('mouseenter'));
+    document.querySelector('section').dispatchEvent(new MouseEvent('mouseenter'));
     expect(api.clear).toHaveBeenCalled();
     expect(api.openFolder).toHaveBeenCalled();
     expect(api.pointer).toHaveBeenCalled();

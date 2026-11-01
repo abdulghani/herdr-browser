@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatDuration } from './format.js';
+import { formatBytes } from './format.js';
 
 describe('formatBytes', () => {
   it('shows bytes as they are', () => {
@@ -19,20 +19,5 @@ describe('formatBytes', () => {
 
   it('stops at terabytes', () => {
     expect(formatBytes(2048 * 1024 ** 4)).toBe('2048 TB');
-  });
-});
-
-describe('formatDuration', () => {
-  it('counts seconds, rounded up, at least one', () => {
-    expect(formatDuration(0)).toBe('1 s');
-    expect(formatDuration(1.2)).toBe('2 s');
-    expect(formatDuration(59)).toBe('59 s');
-  });
-
-  it('counts minutes, then hours and minutes', () => {
-    expect(formatDuration(60)).toBe('1 min');
-    expect(formatDuration(5 * 60 + 20)).toBe('5 min');
-    expect(formatDuration(3599)).toBe('1 h');
-    expect(formatDuration(80 * 60)).toBe('1 h 20 min');
   });
 });

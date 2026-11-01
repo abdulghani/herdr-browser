@@ -5,9 +5,11 @@
     about
       ? [
           ['Version', about.version],
-          ['Chromium', about.chrome],
-          ['Electron', about.electron],
+          ['WebKit', about.webkit],
+          ['Electrobun', about.electrobun],
+          ['Bun', about.bun],
           ['Profile folder', about.profile],
+          ['Downloads folder', about.downloads],
         ]
       : [],
   );
@@ -20,6 +22,10 @@
     <dd class="wrap-anywhere select-text">{value}</dd>
   {/each}
 </dl>
+<p class="mb-4 leading-[1.5] text-muted">
+  This is the experimental Electrobun build: pages render in the system's WebKit, like Safari, and the network (DNS included) follows your
+  Mac's settings.
+</p>
 <p class="mb-4 leading-[1.5] text-muted">
   <a href="https://github.com/abdulghani/herdr-browser" target="_blank">github.com/abdulghani/herdr-browser</a>
 </p>

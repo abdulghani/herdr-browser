@@ -1,11 +1,11 @@
 // Saving the workspaces and tabs to session.json in the profile, and loading them at startup.
-const { app } = require('electron');
+// Only each tab's page comes back: WebKit can't save or restore a view's back/forward history.
 const path = require('path');
 const fs = require('fs');
 
 function createSession(ctx) {
   let saveTimer = null;
-  const sessionFile = () => path.join(app.getPath('userData'), 'session.json');
+  const sessionFile = () => path.join(ctx.profile, 'session.json');
 
   function load() {
     const { workspaces } = ctx;
@@ -16,8 +16,7 @@ function createSession(ctx) {
         ws.id = workspaces.newId('w');
         for (const t of ws.tabs) {
           t.id = workspaces.newId('t');
-          // Back/forward history comes back when the tab is first shown (see createView).
-          if (t.history) ctx.sleeping.keepHistory(t.id, t.history);
+          // Saved by the Electron build; nothing here can restore it.
           delete t.history;
         }
         if (!ws.tabs.length) ws.tabs.push(workspaces.newTab());

@@ -1,8 +1,11 @@
 <script>
-  // The browser UI: workspaces in the sidebar, the active workspace's tabs, the toolbar and the
-  // bars under it. The main process sends the whole state on every change ('state').
+  // The browser UI: workspaces in the sidebar, the active workspace's tabs, the toolbar, the bars
+  // under it, the pages and what is drawn over them. The main process sends the whole state on
+  // every change ('state').
   import FindBar from './FindBar.svelte';
   import NoticeBar from './NoticeBar.svelte';
+  import Overlays from './Overlays.svelte';
+  import PageViews from './PageViews.svelte';
   import Sidebar from './Sidebar.svelte';
   import TabStrip from './TabStrip.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -11,8 +14,9 @@
   const cmd = herdr.cmd;
   const mac = herdr.platform === 'darwin';
 
-  let latest = null; // the newest state from main
+  let latest = $state.raw(null); // the newest state from main
   let shown = $state.raw(null); // the state on screen; held still while a rename is open
+  let nav = $state.raw({ canGoBack: false, canGoForward: false }); // asked from the shown page's view
   let downloads = $state.raw(null); // download progress also comes on its own
   let renaming = $state(null); // { kind, id } while an inline rename input is open
   let helpOpen = $state(false);
@@ -22,6 +26,8 @@
 
   const ws = $derived(shown?.workspaces[shown.activeWs]);
   const tab = $derived(ws?.tabs[ws.activeTab]);
+  // The toolbar's back, forward and reload buttons.
+  const toolbarState = $derived(shown && { ...shown, nav: { ...nav, loading: !!shown.loading } });
 
   function show(s) {
     shown = s;
@@ -76,18 +82,17 @@
     if (latest) latest.downloads = d;
     downloads = d;
   });
-  herdr.on('show-downloads', () => cmd('showDownloads', toolbar.downloadsAnchor()));
   herdr.ready();
 </script>
-
-<svelte:window onresize={() => downloads?.open && cmd('showDownloads', toolbar.downloadsAnchor())} />
 
 <div id="app" class={['flex h-screen', `platform-${herdr.platform}`, shown?.sidebarCollapsed && 'collapsed']}>
   <Sidebar appState={shown} {cmd} {mac} {renaming} onrename={requestRename} onfinishrename={finishRename} bind:helpOpen />
   <main class="flex min-w-0 flex-1 flex-col">
     <TabStrip appState={shown} {cmd} {mac} {renaming} onrename={startRename} onfinishrename={finishRename} />
-    <Toolbar bind:this={toolbar} appState={shown} {tab} {downloads} />
+    <Toolbar bind:this={toolbar} appState={toolbarState} {tab} {downloads} />
     <NoticeBar notice={tab?.notice} {cmd} />
     <FindBar find={shown?.find} tabId={tab?.id} />
+    <PageViews appState={latest} onnav={(next) => (nav = next)} />
   </main>
 </div>
+<Overlays {downloads} anchor={() => toolbar.downloadsAnchor()} />

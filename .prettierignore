@@ -2,6 +2,8 @@ coverage/
 dist/
 dist-ui/
 node_modules/
+.hutch/
+build/icon.iconset/
 package-lock.json
 # Written by the release workflow.
 CHANGELOG.md

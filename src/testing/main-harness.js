@@ -1,19 +1,14 @@
 // Shared setup for the tests that drive the whole main process (src/main.js and the services)
-// through the electron fake. Call useMain() at the top of a test file; `m` and `dir` are the
+// through the Electrobun fake. Call useMain() at the top of a test file; `m` and `dir` are the
 // loaded main process and its profile folder in the current test.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, vi } from 'vitest';
-import { loadMain } from './fake-electron.js';
-
-const realPlatform = process.platform;
-const realPath = process.env.PATH;
+import { keyInput, loadMain } from './fake-electrobun.js';
 
 export let dir;
 export let m;
-
-export const setPlatform = (value) => Object.defineProperty(process, 'platform', { value, configurable: true });
 
 // Loads main.js against a fresh fake, with the test's profile folder unless options say otherwise.
 export function load(options = {}) {
@@ -21,40 +16,39 @@ export function load(options = {}) {
   return m;
 }
 
-// Loads main.js, runs app.whenReady and lets the UI page finish loading.
-export function start(options = {}, argv) {
+// Loads main.js and lets the browser UI ask for the state.
+export function start(options = {}) {
   load(options);
   m.ready();
-  m.finishLoad(argv);
   return m;
 }
 
 export const state = () => m.state();
 export const ws = (i = state().activeWs) => state().workspaces[i];
 export const tab = () => ws().tabs[ws().activeTab];
-export const wc = () => m.shownView().webContents;
-export const ui = () => m.win().webContents;
-export const uiSent = (channel) => ui().send.mock.calls.filter(([c]) => c === channel);
+// The view of the tab on screen.
+export const view = () => m.viewOf(state().shown);
+export const uiSent = (channel) => m.sent.filter(([c]) => c === channel);
 export const sessionFile = () => path.join(dir, 'session.json');
 export const writeSession = (data) => fs.writeFileSync(sessionFile(), JSON.stringify(data));
-export const settingsEvent = (url = 'herdr://settings/') => {
-  const frame = { url };
-  return { sender: { mainFrame: frame }, senderFrame: frame };
-};
+
+// A key press: with Cmd through the application menu, otherwise passed on by the preload of the
+// browser UI (or of the shown page, with { from: 'page' }).
+export function press(chord, { from = 'ui', ...extra } = {}) {
+  if (chord.split('+').includes('cmd') && !Object.keys(extra).length) return m.menuClick(chord);
+  m.pageMessage(from === 'page' ? state().shown : null, keyInput(chord, extra));
+}
 
 export function useMain() {
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'herdr-main-'));
     vi.useFakeTimers();
-    setPlatform('linux');
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    setPlatform(realPlatform);
-    process.env.PATH = realPath;
     delete process.env.HERDR_BROWSER_PROFILE;
     fs.rmSync(dir, { recursive: true, force: true });
   });

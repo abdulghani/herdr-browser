@@ -1,19 +1,18 @@
 <script>
   // The herdr://settings page. window.herdrSettings comes from page-preload.js, which only exposes
-  // it on this page.
+  // it on this page. (The Electron build also had a DNS section; with WebKit the browser can't pick
+  // its own DNS server, so this build has none.)
   import AboutTab from './AboutTab.svelte';
-  import DnsTab from './DnsTab.svelte';
   import ShortcutsTab from './ShortcutsTab.svelte';
 
   const api = window.herdrSettings;
 
   const TABS = [
-    { id: 'dns', label: 'DNS' },
     { id: 'shortcuts', label: 'Shortcuts' },
     { id: 'about', label: 'About' },
   ];
 
-  let data = $state.raw({ settings: null, providers: [], about: null });
+  let data = $state.raw({ about: null });
   let buttons = $state([]);
 
   // The open tab is kept in the URL (herdr://settings/#shortcuts), so a reload stays on it.
@@ -65,9 +64,6 @@
   </div>
 
   <div id="panels">
-    <section role="tabpanel" id="dns" class="rounded-lg border border-border bg-panel p-5" hidden={current !== 'dns'}>
-      <DnsTab {api} settings={data.settings} providers={data.providers} />
-    </section>
     <section role="tabpanel" id="shortcuts" class="rounded-lg border border-border bg-panel p-5" hidden={current !== 'shortcuts'}>
       <ShortcutsTab platform={data.about?.platform} />
     </section>

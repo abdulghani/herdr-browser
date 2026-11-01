@@ -4,13 +4,14 @@
 
   let { row, onaction } = $props();
 
-  const LABELS = { show: 'Show in folder', pause: 'Pause', resume: 'Resume', cancel: 'Cancel', retry: 'Retry', remove: 'Remove from list' };
+  const LABELS = { show: 'Show in folder', remove: 'Remove from list' };
 
-  // Which buttons a row gets for where its download is.
+  // Which buttons a row gets for where its download is. WebKit's downloads can't be paused,
+  // resumed, cancelled or retried from here, so a running one has none.
   function actionsFor(row) {
-    if (row.state === 'progressing') return [row.paused ? 'resume' : 'pause', 'cancel'];
+    if (row.state === 'progressing') return [];
     if (row.state === 'completed' && !row.removed) return ['show', 'remove'];
-    return ['retry', 'remove'];
+    return ['remove'];
   }
 
   // "report.pdf" -> "PDF", shown on the file icon.
@@ -18,8 +19,8 @@
 
   const kind = $derived(row.removed ? 'removed' : row.state);
   const openable = $derived(row.state === 'completed' && !row.removed);
-  const faded = $derived(['removed', 'cancelled', 'interrupted'].includes(kind));
-  const struck = $derived(kind === 'removed' || kind === 'cancelled');
+  const faded = $derived(kind === 'removed' || kind === 'interrupted');
+  const struck = $derived(kind === 'removed');
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (rows are pointed at; the buttons take the keyboard) -->
@@ -45,28 +46,20 @@
     <span class={['dl-name truncate', struck ? 'text-muted line-through' : 'text-fg']}>{row.filename}</span>
     <span class={['dl-status truncate text-[11px]', kind === 'interrupted' ? 'text-error' : 'text-muted']}>{row.status}</span>
     {#if row.state === 'progressing'}
-      <span class={['dl-bar relative h-[3px] overflow-hidden rounded-[2px] bg-border', row.paused && 'paused']}>
+      <span class="dl-bar relative h-[3px] overflow-hidden rounded-[2px] bg-border">
         {#if row.progress === null}
-          <span
-            class={[
-              'dl-bar-fill indeterminate animate-dl-slide absolute inset-y-0 w-[30%] rounded-[2px]',
-              row.paused ? 'bg-muted' : 'bg-accent',
-            ]}
-          ></span>
+          <span class="dl-bar-fill indeterminate animate-dl-slide absolute inset-y-0 w-[30%] rounded-[2px] bg-accent"></span>
         {:else}
           <span
-            class={[
-              'dl-bar-fill absolute inset-y-0 left-0 rounded-[2px] transition-[width] duration-200',
-              row.paused ? 'bg-muted' : 'bg-accent',
-            ]}
+            class="dl-bar-fill absolute inset-y-0 left-0 rounded-[2px] bg-accent transition-[width] duration-200"
             style:width={`${Math.round(row.progress * 100)}%`}
           ></span>
         {/if}
       </span>
     {/if}
   </span>
-  <!-- The buttons show on hover, and always while the download runs (so it can be paused). -->
-  <span class={['dl-actions flex flex-none gap-0.5', row.state === 'progressing' ? 'visible' : 'invisible group-hover:visible']}>
+  <!-- The buttons show on hover. -->
+  <span class="dl-actions invisible flex flex-none gap-0.5 group-hover:visible">
     {#each actionsFor(row) as name (name)}
       <button
         class={`dl-btn dl-${name} flex size-[26px] items-center justify-center p-0 hover:bg-border`}

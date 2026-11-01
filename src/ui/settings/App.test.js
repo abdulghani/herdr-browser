@@ -4,12 +4,15 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.svelte';
 
-const providers = [
-  { id: 'system', name: 'System', detail: 'Your network' },
-  { id: 'cloudflare', name: 'Cloudflare', detail: '1.1.1.1' },
-  { id: 'custom', name: 'Custom', detail: 'Your own server' },
-];
-const about = { platform: 'linux', version: '1.2.3', chrome: '140', electron: '45', profile: '/home/me/.config/herdr' };
+const about = {
+  platform: 'linux',
+  version: '1.2.3',
+  webkit: '21624.1',
+  electrobun: '2.0.5',
+  bun: '1.4.4',
+  profile: '/Users/me/Library/Application Support/dev.herdr.browser.electrobun/stable',
+  downloads: '/Users/me/Downloads',
+};
 
 let api;
 const $ = (id) => document.getElementById(id);
@@ -18,18 +21,10 @@ const flush = async () => {
   flushSync();
 };
 
-async function open({ hash = '', provider = 'system', platform = 'linux' } = {}) {
+async function open({ hash = '', platform = 'linux' } = {}) {
   cleanup();
   history.replaceState(null, '', `/${hash}`);
-  api = {
-    get: vi.fn(async () => ({
-      settings: { dns: { provider, customUrl: 'https://dns.example/q' } },
-      providers,
-      about: { ...about, platform },
-    })),
-    setDns: vi.fn(async () => {}),
-    resolve: vi.fn(),
-  };
+  api = { get: vi.fn(async () => ({ about: { ...about, platform } })) };
   window.herdrSettings = api;
   render(App);
   await flush();
@@ -39,36 +34,31 @@ afterEach(cleanup);
 
 const selectedTab = () => document.querySelector('[role="tab"][aria-selected="true"]').dataset.tab;
 const visiblePanels = () => [...document.querySelectorAll('[role="tabpanel"]')].filter((p) => !p.hidden).map((p) => p.id);
-const radio = (id) => document.querySelector(`input[name="dns"][value="${id}"]`);
 const click = (el) => flushSync(() => el.click());
-const submit = (form) => flushSync(() => form.dispatchEvent(new Event('submit', { cancelable: true })));
-const typeInto = (input, value) => {
-  input.value = value;
-  flushSync(() => input.dispatchEvent(new Event('input', { bubbles: true })));
-};
 
 describe('tabs', () => {
   beforeEach(() => open());
 
   it('opens on the first tab', () => {
-    expect(selectedTab()).toBe('dns');
-    expect(visiblePanels()).toEqual(['dns']);
-    expect(location.hash).toBe('#dns');
-    expect($('dns').hidden).toBe(false);
-    expect(document.querySelector('[data-tab="dns"]').tabIndex).toBe(0);
-    expect(document.querySelector('[data-tab="about"]').tabIndex).toBe(-1);
-  });
-
-  it('switches tab on click and keeps it in the URL', () => {
-    click(document.querySelector('[data-tab="shortcuts"]'));
     expect(selectedTab()).toBe('shortcuts');
     expect(visiblePanels()).toEqual(['shortcuts']);
     expect(location.hash).toBe('#shortcuts');
+    expect(document.querySelector('[data-tab="shortcuts"]').tabIndex).toBe(0);
+    expect(document.querySelector('[data-tab="about"]').tabIndex).toBe(-1);
+    // With WebKit the browser can't choose its DNS server, so there is no DNS section.
+    expect($('dns')).toBeNull();
+  });
+
+  it('switches tab on click and keeps it in the URL', () => {
+    click(document.querySelector('[data-tab="about"]'));
+    expect(selectedTab()).toBe('about');
+    expect(visiblePanels()).toEqual(['about']);
+    expect(location.hash).toBe('#about');
   });
 
   it('ignores clicks between tabs', () => {
     click($('tabs'));
-    expect(selectedTab()).toBe('dns');
+    expect(selectedTab()).toBe('shortcuts');
   });
 
   it('moves between tabs with the up and down arrows, wrapping around', () => {
@@ -78,18 +68,17 @@ describe('tabs', () => {
       flushSync(() => tabs.dispatchEvent(e));
       return e;
     };
-    document.querySelector('[data-tab="dns"]').focus();
+    document.querySelector('[data-tab="shortcuts"]').focus();
     expect(key('ArrowDown').defaultPrevented).toBe(true);
+    expect(selectedTab()).toBe('about');
+    expect(document.activeElement.dataset.tab).toBe('about');
+    key('ArrowDown');
     expect(selectedTab()).toBe('shortcuts');
-    expect(document.activeElement.dataset.tab).toBe('shortcuts');
-    key('ArrowUp');
     key('ArrowUp');
     expect(selectedTab()).toBe('about');
     expect(location.hash).toBe('#about');
-    key('ArrowDown');
-    expect(selectedTab()).toBe('dns');
     expect(key('ArrowLeft').defaultPrevented).toBe(false);
-    expect(selectedTab()).toBe('dns');
+    expect(selectedTab()).toBe('about');
   });
 });
 
@@ -101,9 +90,9 @@ describe('opening with a tab in the URL', () => {
   });
 
   it('falls back to the first tab for an unknown one', async () => {
-    await open({ hash: '#nope' });
-    expect(selectedTab()).toBe('dns');
-    expect(location.hash).toBe('#dns');
+    await open({ hash: '#dns' });
+    expect(selectedTab()).toBe('shortcuts');
+    expect(location.hash).toBe('#shortcuts');
   });
 });
 
@@ -117,23 +106,37 @@ describe('shortcuts and about', () => {
     expect(list).toContainEqual(['Close tab', 'Ctrl+W']);
     expect(list).toContainEqual(['Downloads', 'Ctrl+J']);
     expect(list.find(([action]) => action === 'Reopen closed tab')).toBeUndefined();
-    expect(list).toHaveLength(18);
+    expect(list).toHaveLength(19);
   });
 
   it('lists the macOS keys on a Mac', async () => {
     await open({ platform: 'darwin' });
     const list = shortcuts();
     expect(list).toContainEqual(['New tab', 'Cmd+T']);
-    expect(list).toContainEqual(['Close tab', 'Ctrl+W']);
+    expect(list).toContainEqual(['Close tab', 'Cmd+W, Ctrl+W']);
     expect(list).toContainEqual(['Reopen closed tab', 'Cmd+Shift+T']);
     expect(list).toContainEqual(['Downloads', 'Cmd+Option+L']);
-    expect(list).toHaveLength(19);
+    expect(list).toContainEqual(['Back / forward', 'Cmd+[ / Cmd+]']);
+    expect(list).toHaveLength(20);
   });
 
-  it('lists the versions and profile folder', async () => {
+  it('lists the versions and folders', async () => {
     await open();
     const text = [...document.querySelectorAll('#about-list > *')].map((n) => n.textContent);
-    expect(text).toEqual(['Version', '1.2.3', 'Chromium', '140', 'Electron', '45', 'Profile folder', about.profile]);
+    expect(text).toEqual([
+      'Version',
+      '1.2.3',
+      'WebKit',
+      '21624.1',
+      'Electrobun',
+      '2.0.5',
+      'Bun',
+      '1.4.4',
+      'Profile folder',
+      about.profile,
+      'Downloads folder',
+      about.downloads,
+    ]);
   });
 });
 
@@ -142,101 +145,7 @@ describe('before the settings load', () => {
     cleanup();
     window.herdrSettings = { get: () => new Promise(() => {}) };
     render(App);
-    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(3);
-    expect(document.querySelectorAll('#shortcut-list tr, #about-list > *, #dns-providers label')).toHaveLength(0);
-  });
-});
-
-describe('DNS form', () => {
-  it('lists the providers with the saved one chosen', async () => {
-    await open({ provider: 'cloudflare' });
-    const labels = [...document.querySelectorAll('#dns-providers .provider')];
-    expect(labels.map((l) => l.querySelector('.name').textContent)).toEqual(['System', 'Cloudflare', 'Custom']);
-    expect(labels[1].querySelector('.detail').textContent).toBe('1.1.1.1');
-    expect(radio('cloudflare').checked).toBe(true);
-    expect($('custom-url').value).toBe('https://dns.example/q');
-    expect($('custom-row').hidden).toBe(true);
-  });
-
-  it('shows the server address only for a custom server', async () => {
-    await open({ provider: 'custom' });
-    expect($('custom-row').hidden).toBe(false);
-    click(radio('system'));
-    expect($('custom-row').hidden).toBe(true);
-    click(radio('custom'));
-    expect($('custom-row').hidden).toBe(false);
-  });
-
-  it('saves the chosen server', async () => {
-    await open();
-    click(radio('custom'));
-    typeInto($('custom-url'), 'https://mine.example/dns-query');
-    submit($('dns-form'));
-    expect($('dns-save').disabled).toBe(true);
-    await flush();
-    expect(api.setDns).toHaveBeenCalledWith({ provider: 'custom', customUrl: 'https://mine.example/dns-query' });
-    expect($('dns-status').textContent).toBe('Saved. New lookups use this server.');
-    expect($('dns-status').classList.contains('ok')).toBe(true);
-    expect($('dns-status').classList.contains('text-ok')).toBe(true);
-    expect($('dns-save').disabled).toBe(false);
-  });
-
-  it('shows why saving failed, without the IPC wrapper text', async () => {
-    await open();
-    api.setDns.mockRejectedValueOnce(new Error("Error invoking remote method 'settings-set-dns': Error: Not a valid https URL"));
-    submit($('dns-form'));
-    await flush();
-    expect($('dns-status').textContent).toBe('Not a valid https URL');
-    expect($('dns-status').classList.contains('error')).toBe(true);
-    expect($('dns-status').classList.contains('text-error')).toBe(true);
-    expect($('dns-save').disabled).toBe(false);
-  });
-});
-
-describe('lookup test', () => {
-  beforeEach(() => open());
-  const results = () => [...document.querySelectorAll('#resolve-result li')];
-
-  it('lists the addresses found', async () => {
-    let answer;
-    api.resolve.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    typeInto($('resolve-host'), '  example.com ');
-    submit($('resolve-form'));
-    expect(api.resolve).toHaveBeenCalledWith('example.com');
-    expect(results().map((li) => li.textContent)).toEqual(['Looking up…']);
-    answer({
-      addresses: [
-        { family: 'IPv4', address: '93.184.215.14' },
-        { family: 'IPv6', address: '2606:2800::1' },
-      ],
-    });
-    await flush();
-    expect(results().map((li) => [li.querySelector('.family').textContent, li.textContent])).toEqual([
-      ['IPv4', 'IPv493.184.215.14'],
-      ['IPv6', 'IPv62606:2800::1'],
-    ]);
-  });
-
-  it('shows a lookup error', async () => {
-    api.resolve.mockResolvedValueOnce({ error: 'ENOTFOUND' });
-    typeInto($('resolve-host'), 'nope.invalid');
-    submit($('resolve-form'));
-    await flush();
-    expect(results()).toHaveLength(1);
-    expect(results()[0].classList.contains('error')).toBe(true);
-    expect(results()[0].textContent).toBe("Couldn't look up nope.invalid: ENOTFOUND");
-  });
-
-  it('does nothing without a host', () => {
-    typeInto($('resolve-host'), '   ');
-    submit($('resolve-form'));
-    expect(api.resolve).not.toHaveBeenCalled();
-    expect(results()).toHaveLength(0);
-  });
-
-  it('looks up example.com by default', () => {
-    api.resolve.mockReturnValueOnce(new Promise(() => {}));
-    submit($('resolve-form'));
-    expect(api.resolve).toHaveBeenCalledWith('example.com');
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(document.querySelectorAll('#shortcut-list tr, #about-list > *')).toHaveLength(0);
   });
 });

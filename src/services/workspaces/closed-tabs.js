@@ -7,13 +7,11 @@ function createClosedTabs(ctx) {
   const closedStack = []; // oldest first; saved with the session so it survives a restart
 
   // What is saved of a tab, in the session and here.
-  const snapshot = (tab) => {
-    const { url, title, favicon, customName } = tab;
-    return { url, title, favicon, customName, history: ctx.views.historyOf(tab.id) };
-  };
+  // (Only the page: WebKit has no way to save the back/forward history.)
+  const snapshot = ({ url, title, favicon, customName }) => ({ url, title, favicon, customName });
 
-  // A blank tab that never went anywhere isn't worth reopening.
-  const isEmptyTab = (snap) => snap.url === BLANK_URL && !(snap.history?.entries.length > 1);
+  // A blank tab isn't worth reopening.
+  const isEmptyTab = (snap) => snap.url === BLANK_URL;
 
   function remember(entry) {
     const tabs = entry.kind === 'tab' ? [entry.tab] : entry.ws.tabs;
@@ -28,11 +26,8 @@ function createClosedTabs(ctx) {
     if (Array.isArray(saved)) closedStack.push(...saved.slice(-MAX_CLOSED));
   }
 
-  function tabFromSnapshot({ history, ...fields }) {
-    const tab = { ...ctx.workspaces.newTab(fields.url), ...fields };
-    if (history) ctx.sleeping.keepHistory(tab.id, history);
-    return tab;
-  }
+  // Entries saved by the Electron build may still carry a history; it is dropped.
+  const tabFromSnapshot = ({ history: _history, ...fields }) => ({ ...ctx.workspaces.newTab(fields.url), ...fields });
 
   function reopenTab(entry) {
     const { state, workspaces } = ctx;

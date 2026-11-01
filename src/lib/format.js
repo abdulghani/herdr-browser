@@ -1,5 +1,4 @@
-// Sizes and times as people read them, e.g. "3.2 MB" and "2 min". Kept free of Electron so it
-// can be unit tested.
+// Sizes as people read them, e.g. "3.2 MB". Kept free of Electrobun so it can be unit tested.
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 
@@ -15,15 +14,4 @@ function formatBytes(bytes) {
   return `${text} ${UNITS[unit]}`;
 }
 
-// Seconds -> "2 s", "5 min", "1 h 20 min" (rounded up to a second, then to a minute).
-function formatDuration(seconds) {
-  const s = Math.max(1, Math.ceil(seconds));
-  if (s < 60) return `${s} s`;
-  const minutes = Math.round(s / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} h ${rest} min` : `${hours} h`;
-}
-
-module.exports = { formatBytes, formatDuration };
+module.exports = { formatBytes };

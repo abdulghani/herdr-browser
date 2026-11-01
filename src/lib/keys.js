@@ -1,5 +1,5 @@
 // A key press -> the name used in the key tables, e.g. "cmd+shift+t". Modifiers always come in
-// the order ctrl, alt, cmd, shift. Kept free of Electron so it can be unit tested.
+// the order ctrl, alt, cmd, shift. Kept free of Electrobun so it can be unit tested.
 const KEY_NAMES = {
   ArrowUp: 'up',
   ArrowDown: 'down',

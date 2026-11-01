@@ -1,124 +1,98 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
-import { dir, load, m, setPlatform, start, state, tab, uiSent, useMain, wc, ws } from './testing/main-harness.js';
+import { describe, expect, it } from 'vitest';
+import { dir, load, m, sessionFile, start, state, tab, uiSent, useMain, view, ws } from './testing/main-harness.js';
 
 useMain();
 
 describe('startup', () => {
-  it('names the app, looks like plain Chrome and registers herdr://', () => {
+  it('opens the window on the built browser UI, with the tab strip as its title bar', () => {
     load();
-    const { app, protocol } = m.electron;
-    expect(app.setName).toHaveBeenCalledWith('Herdr Browser');
-    expect(app.userAgentFallback).toBe('Mozilla/5.0 Chrome/140.0 Safari/537.36');
-    expect(protocol.registerSchemesAsPrivileged).toHaveBeenCalledWith([
-      { scheme: 'herdr', privileges: { standard: true, secure: true, supportFetchAPI: true } },
-    ]);
-    expect(app.quit).not.toHaveBeenCalled();
+    expect(m.win().options).toMatchObject({
+      title: 'Herdr Browser',
+      url: 'views://ui/browser/index.html',
+      titleBarStyle: 'hiddenInset',
+      trafficLightOffset: { x: 12, y: 11 },
+    });
+    expect(m.electrobun.ApplicationMenu.setApplicationMenu).toHaveBeenCalled();
   });
 
-  it('uses the profile from HERDR_BROWSER_PROFILE', () => {
-    process.env.HERDR_BROWSER_PROFILE = dir;
-    load({ userData: '/nowhere' });
-    expect(m.electron.app.setPath).toHaveBeenCalledWith('userData', path.resolve(dir));
+  it('keeps the profile in the app data folder, or in HERDR_BROWSER_PROFILE', () => {
+    const nested = path.join(dir, 'a', 'b');
+    load({ userData: nested });
+    expect(fs.existsSync(nested)).toBe(true);
+    process.env.HERDR_BROWSER_PROFILE = path.join(dir, 'other');
+    start({ userData: '/nowhere' });
+    m.win().emit('close');
+    expect(fs.existsSync(path.join(dir, 'other', 'session.json'))).toBe(true);
   });
 
-  it('quits when another instance holds the lock', () => {
-    load({ singleInstance: false });
-    expect(m.electron.app.quit).toHaveBeenCalled();
+  it('carries on when the profile folder cannot be made', () => {
+    const file = path.join(dir, 'file');
+    fs.writeFileSync(file, '');
+    expect(() => load({ userData: path.join(file, 'profile') })).not.toThrow();
   });
 
-  it('quits when all windows close', () => {
+  it('opens one workspace with a blank tab once the UI is ready', () => {
     load();
-    m.handlers.app.emit('window-all-closed');
-    expect(m.electron.app.quit).toHaveBeenCalled();
-  });
-
-  it('opens one workspace with a blank tab', () => {
-    start();
+    expect(state()).toBeUndefined();
+    m.ready();
     expect(state().workspaces).toEqual([{ id: expect.any(String), name: 'main', activeTab: 0, tabs: [expect.any(Object)] }]);
     expect(tab()).toMatchObject({ url: 'about:blank', title: 'New Tab', favicon: null });
-    expect(m.pageViews()).toHaveLength(1);
-    expect(wc().loadURL).toHaveBeenCalledWith('about:blank');
-    expect(m.shownView().background).toBe('#0b0d10');
-    expect(m.shownView().bounds).toEqual({ x: 220, y: 76, width: 1180, height: 824 });
-    expect(wc().focus).toHaveBeenCalled();
+    expect(state()).toMatchObject({ prefixArmed: false, find: null, loading: true, shown: tab().id, awake: [tab().id] });
+    expect(state().pages).toEqual([{ id: tab().id, src: 'about:blank' }]);
+    expect(state().keys).toEqual(expect.arrayContaining(['ctrl+space', 'ctrl+t', 'alt+1', 'ctrl+9']));
+    expect(state().keys).not.toContain('cmd+t');
+    expect(view().url).toBe('about:blank');
     expect(m.win().setTitle).toHaveBeenLastCalledWith('New Tab — main');
-    expect(state()).toMatchObject({ prefixArmed: false, find: null, nav: { canGoBack: false, canGoForward: false, loading: false } });
-    expect(m.electron.Menu.setApplicationMenu).toHaveBeenCalledWith(null);
-    expect(m.win().loadFile).toHaveBeenCalledWith(expect.stringMatching(/dist-ui[/\\]browser[/\\]index\.html$/));
-    expect(m.win().options.titleBarStyle).toBeUndefined();
   });
 
-  it('hides the native title bar on macOS', () => {
-    setPlatform('darwin');
-    start();
-    expect(m.win().options).toMatchObject({ titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 11 } });
-  });
-
-  it('applies the saved DNS setting', () => {
-    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ dns: { provider: 'cloudflare' } }));
-    start();
-    expect(m.electron.app.configureHostResolver).toHaveBeenCalledWith({
-      secureDnsMode: 'secure',
-      secureDnsServers: ['https://cloudflare-dns.com/dns-query'],
-    });
-  });
-
-  it('opens URLs and files passed on the command line', () => {
-    const file = path.join(dir, 'page.html');
-    fs.writeFileSync(file, '<p>hi</p>');
-    start({}, ['electron', '.', '--flag', 'example.com', file]);
-    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://example.com', `file://${file}`]);
-  });
-
-  it('skips only the executable in a packaged app', () => {
-    start({ isPackaged: true }, ['/Applications/Herdr', 'example.com']);
-    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://example.com']);
-  });
-
-  it('re-sends the state when the UI asks', () => {
+  it('re-sends the state when the UI asks again', () => {
     start();
     const before = uiSent('state').length;
-    m.ipc('ready', {});
+    m.ready();
     expect(uiSent('state')).toHaveLength(before + 1);
+    expect(ws().tabs).toHaveLength(1);
+  });
+
+  it('closes the suggestions and the downloads panel when the window loses focus', () => {
+    start();
+    m.cmd('showDownloads');
+    m.win().emit('blur');
+    expect(uiSent('suggest-close')).toHaveLength(1);
+    expect(state().downloads.open).toBe(false);
+  });
+
+  it('saves everything on quit', () => {
+    start();
+    m.cmd('navigate', 'example.com');
+    m.appEvents.emit('before-quit');
+    expect(JSON.parse(fs.readFileSync(sessionFile(), 'utf8')).workspaces[0].tabs[0].url).toBe('https://example.com');
+    expect(fs.existsSync(path.join(dir, 'downloads.json'))).toBe(true);
+    m.menuClick('cmd+q');
+    expect(m.electrobun.Utils.quit).toHaveBeenCalled();
   });
 });
 
 describe('links from outside', () => {
-  const event = () => ({ preventDefault: vi.fn() });
+  const open = (url) => m.appEvents.emit('open-url', { data: { url } });
 
-  it('holds links that arrive before the window is ready', () => {
+  it('holds links that arrive before the UI is ready', () => {
     load();
-    const e = event();
-    m.handlers.app.emit('open-url', e, 'https://early.example/');
-    m.handlers.app.emit('open-file', event(), '/tmp/page.html');
-    expect(e.preventDefault).toHaveBeenCalled();
-    m.handlers.app.emit('second-instance', {}, ['herdr', '.', 'ignored.example']);
+    open('https://early.example/');
+    open('file:///tmp/page.html');
     m.ready();
-    m.finishLoad();
     expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://early.example/', 'file:///tmp/page.html']);
   });
 
   it('opens links in the running window, bringing it back', () => {
     start();
     m.win().minimized = true;
-    m.handlers.app.emit('open-url', event(), 'https://late.example/');
-    expect(m.win().restore).toHaveBeenCalled();
+    open('https://late.example/');
+    expect(m.win().unminimize).toHaveBeenCalled();
     expect(m.win().focus).toHaveBeenCalled();
     expect(tab().url).toBe('https://late.example/');
-    m.handlers.app.emit('open-url', event(), 'https://again.example/');
-    expect(m.win().restore).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens URLs from a second launch', () => {
-    start();
-    m.win().minimized = true;
-    m.handlers.app.emit('second-instance', {}, ['herdr', '.', 'example.com']);
-    expect(m.win().restore).toHaveBeenCalled();
-    expect(tab().url).toBe('https://example.com');
-    m.handlers.app.emit('second-instance', {}, ['herdr', '.']);
-    expect(m.win().restore).toHaveBeenCalledTimes(1);
-    expect(ws().tabs).toHaveLength(2);
+    open('https://again.example/');
+    expect(m.win().unminimize).toHaveBeenCalledTimes(1);
   });
 });

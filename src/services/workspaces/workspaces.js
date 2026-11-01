@@ -28,20 +28,20 @@ function createWorkspaces(ctx) {
   // Send the state to the browser UI and save the session soon.
   function broadcast() {
     const { win } = ctx;
-    if (!win || win.isDestroyed()) return;
+    if (!win) return;
     const tab = activeTab();
-    const wc = ctx.views.get(tab.id)?.webContents;
-    win.webContents.send('state', {
+    ctx.ui.send('state', {
       ...ctx.state,
       prefixArmed: ctx.keyboard.prefixArmed(),
+      // The tabs with a page view, what each starts on, and the one on screen.
       awake: ctx.views.awake(),
+      pages: ctx.views.pages(),
+      shown: ctx.views.shown(),
+      // The keys page preloads pass on to the main process (src/ui/page-preload.js).
+      keys: ctx.keyboard.forwardedKeys(),
       find: ctx.find.get(tab.id) || null,
       downloads: ctx.downloads.summary(),
-      nav: {
-        canGoBack: wc ? wc.navigationHistory.canGoBack() : false,
-        canGoForward: wc ? wc.navigationHistory.canGoForward() : false,
-        loading: wc ? wc.isLoading() : false,
-      },
+      loading: ctx.views.isLoading(tab.id),
     });
     win.setTitle(`${tab.title} — ${activeWs().name}`);
     ctx.session.saveSoon();
@@ -132,8 +132,8 @@ function createWorkspaces(ctx) {
   // ---------- workspaces ----------
 
   function requestRename(kind, id) {
-    ctx.win.webContents.focus();
-    ctx.win.webContents.send('rename', { kind, id });
+    ctx.views.focusUi();
+    ctx.ui.send('rename', { kind, id });
   }
 
   function addWorkspace() {
@@ -205,7 +205,6 @@ function createWorkspaces(ctx) {
 
   function toggleSidebar() {
     ctx.state.sidebarCollapsed = !ctx.state.sidebarCollapsed;
-    ctx.views.layout();
     broadcast();
   }
 
@@ -217,8 +216,8 @@ function createWorkspaces(ctx) {
   }
 
   function focusAddressBar() {
-    ctx.win.webContents.focus();
-    ctx.win.webContents.send('focus-address');
+    ctx.views.focusUi();
+    ctx.ui.send('focus-address');
   }
 
   return {

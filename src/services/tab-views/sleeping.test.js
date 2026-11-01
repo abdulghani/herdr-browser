@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { m, start, state, tab, useMain, wc } from '../../testing/main-harness.js';
+import { m, start, state, tab, useMain, view } from '../../testing/main-harness.js';
 
 useMain();
 
@@ -8,49 +8,42 @@ describe('tab sleeping', () => {
 
   beforeEach(() => start());
 
-  it('unloads a tab hidden for 10 minutes and wakes it with its history', () => {
+  it('unloads a tab hidden for 10 minutes and loads its page again when selected', () => {
     m.cmd('navigate', 'a.com');
-    const sleeper = m.shownView();
-    Object.assign(sleeper.webContents, { entries: [{ url: 'https://a.com/' }], activeIndex: 0 });
+    view().fire('dom-ready');
     const sleeperId = tab().id;
     m.cmd('newTab');
     vi.advanceTimersByTime(30 * 1000); // first check notes when it was hidden
+    expect(state().awake).toHaveLength(2);
     vi.advanceTimersByTime(10 * MINUTE);
-    expect(sleeper.webContents.close).toHaveBeenCalled();
     expect(state().awake).toEqual([tab().id]);
+    expect(state().pages.map((p) => p.id)).toEqual([tab().id]);
 
     m.cmd('selectTab', sleeperId);
     expect(state().awake).toContain(sleeperId);
-    expect(wc().navigationHistory.restore).toHaveBeenCalledWith({ entries: [{ url: 'https://a.com/' }], index: 0 });
+    expect(view().url).toBe('https://a.com');
   });
 
-  it('keeps tabs that use the camera or are loading awake', () => {
+  it('keeps tabs in a call, playing sound or loading awake', () => {
     m.cmd('navigate', 'meet.example');
-    const call = m.shownView().webContents;
+    view().fire('dom-ready');
+    const call = tab().id;
+    m.pageMessage(call, { type: 'media', active: true });
+    m.cmd('newTab');
+    m.cmd('navigate', 'music.example');
+    view().fire('dom-ready');
+    const music = tab().id;
+    m.pageMessage(music, { type: 'media', active: true });
     m.cmd('newTab');
     m.cmd('navigate', 'slow.example');
-    m.shownView().webContents.loading = true;
     m.cmd('newTab');
-
-    const cb = vi.fn();
-    m.handlers.permission(call, 'media', cb, { mediaTypes: ['video'] });
-    expect(cb).toHaveBeenCalledWith(true);
     vi.advanceTimersByTime(11 * MINUTE);
-    expect(state().awake).toHaveLength(3);
+    expect(state().awake).toHaveLength(4);
 
-    // Leaving the page ends the call.
-    call.emit('did-navigate', {}, 'https://example.com/');
+    // Leaving the page ends the call; the music stops.
+    m.viewOf(call).fire('did-navigate', 'https://example.com/');
+    m.pageMessage(music, { type: 'media', active: false });
     vi.advanceTimersByTime(MINUTE);
     expect(state().awake).toHaveLength(2);
-    expect(call.close).toHaveBeenCalled();
-  });
-
-  it('grants everyday permissions only', () => {
-    const cb = vi.fn();
-    m.handlers.permission(wc(), 'geolocation', cb, {});
-    expect(cb).toHaveBeenLastCalledWith(false);
-    m.handlers.permission({}, 'media', cb, { mediaTypes: ['audio'] });
-    m.handlers.permission(wc(), 'media', cb, {});
-    expect(cb).toHaveBeenLastCalledWith(true);
   });
 });
