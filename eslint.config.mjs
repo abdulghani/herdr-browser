@@ -3,7 +3,7 @@ import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
 export default [
-  { ignores: ['dist/', 'node_modules/'] },
+  { ignores: ['dist/', 'node_modules/', 'coverage/'] },
   js.configs.recommended,
   // Main process and its modules.
   {
@@ -23,6 +23,11 @@ export default [
   {
     files: ['test/**/*.js', '*.config.{js,mjs}'],
     languageOptions: { sourceType: 'module', globals: { ...globals.node } },
+  },
+  // Tests of the UI scripts run in jsdom, which provides the browser globals.
+  {
+    files: ['test/ui-*.test.js', 'test/settings-page.test.js', 'test/preloads.test.js', 'test/helpers/dom.js'],
+    languageOptions: { globals: { ...globals.browser } },
   },
   {
     rules: {

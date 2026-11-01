@@ -47,6 +47,7 @@ On macOS the tab strip is the title bar, `Cmd+T` opens a tab, `Cmd+L` focuses th
 npm install
 npm start               # run from source
 npm test                # unit tests (vitest)
+npm run test:coverage   # unit tests with coverage; fails below 80%
 npm run lint            # eslint
 npm run format          # prettier (npm run format:check only checks)
 npm run knip            # unused files, exports and dependencies
