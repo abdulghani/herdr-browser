@@ -7,16 +7,15 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { createHistory } = require('./suggest');
 const { DNS_PROVIDERS, createSettings, applyDns } = require('./settings');
+const { normalizeUrl, chordOf } = require('./input');
 
 const SIDEBAR_WIDTH = 220;
 const SIDEBAR_COLLAPSED_WIDTH = 52; // icon rail, must match styles.css
 const CHROME_HEIGHT = 76; // tab strip + toolbar, must match styles.css
 const NOTICE_HEIGHT = 36; // per-tab notice bar under the toolbar, must match styles.css
 const FIND_HEIGHT = 36; // per-tab find bar under the notice bar, must match styles.css
-const HOME_URL = 'https://www.google.com';
 const BLANK_URL = 'about:blank'; // new tabs start here, with the address bar focused
 const BLANK_BG = '#0b0d10'; // --bg in styles.css, so a blank tab isn't a white flash
-const SEARCH_URL = 'https://www.google.com/search?q=';
 const SETTINGS_URL = 'herdr://settings/';
 // Background tabs not looked at for this long are unloaded to free memory (like Chrome's
 // Memory Saver) and reload, with their back/forward history, when selected again.
@@ -274,15 +273,6 @@ function sleepIdleTabs() {
 
 // ---------- actions ----------
 
-function normalizeUrl(input) {
-  const text = input.trim();
-  if (!text) return HOME_URL;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return text;
-  if (/^localhost(:\d+)?(\/|$)/.test(text) || /^[\d.]+(:\d+)?(\/|$)/.test(text)) return `http://${text}`;
-  if (!/\s/.test(text) && /\.[a-z]{2,}(:\d+)?(\/|$)/i.test(text)) return `https://${text}`;
-  return SEARCH_URL + encodeURIComponent(text);
-}
-
 function openTab(url = BLANK_URL, ws = activeWs(), index = ws.tabs.length) {
   const tab = newTab(url);
   ws.tabs.splice(index, 0, tab);
@@ -399,8 +389,7 @@ function reopenClosed() {
   if (!entry) return;
   if (entry.kind === 'tab') {
     // Back into its workspace if that's still open (ids change across restarts, so fall back to the name).
-    const ws =
-      state.workspaces.find((w) => w.id === entry.wsId) || state.workspaces.find((w) => w.name === entry.wsName) || activeWs();
+    const ws = state.workspaces.find((w) => w.id === entry.wsId) || state.workspaces.find((w) => w.name === entry.wsName) || activeWs();
     const index = Math.min(entry.index, ws.tabs.length);
     ws.tabs.splice(index, 0, tabFromSnapshot(entry.tab));
     state.activeWs = state.workspaces.indexOf(ws);
@@ -421,8 +410,7 @@ function selectWorkspace(index) {
   showActiveView();
 }
 
-const cycleWorkspace = (delta) =>
-  selectWorkspace((state.activeWs + delta + state.workspaces.length) % state.workspaces.length);
+const cycleWorkspace = (delta) => selectWorkspace((state.activeWs + delta + state.workspaces.length) % state.workspaces.length);
 
 function moveWorkspace(delta) {
   const from = state.activeWs;
@@ -528,7 +516,12 @@ let suggestView = null;
 function showSuggestions({ rows, selected, rect }) {
   if (!suggestView) {
     suggestView = new WebContentsView({
-      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'suggest-preload.js') },
+      webPreferences: {
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+        preload: path.join(__dirname, 'suggest-preload.js'),
+      },
     });
     suggestView.setBackgroundColor('#00000000');
     suggestView.webContents.loadFile(path.join(__dirname, 'ui', 'suggest.html'));
@@ -593,9 +586,7 @@ function externalBrowser() {
         ? ['/Applications', path.join(app.getPath('home'), 'Applications'), '/System/Volumes/Preboot/Cryptexes/App/System/Applications']
         : (process.env.PATH || '').split(path.delimiter);
     externalBrowserCache =
-      candidates.find(({ bin, app: name }) =>
-        dirs.some((dir) => fs.existsSync(path.join(dir, bin || `${name}.app`))),
-      ) || null;
+      candidates.find(({ bin, app: name }) => dirs.some((dir) => fs.existsSync(path.join(dir, bin || `${name}.app`)))) || null;
   }
   return externalBrowserCache;
 }
@@ -667,19 +658,6 @@ const DIRECT_ACTIONS = {
 function zoom(delta) {
   const wc = activeWc();
   if (wc) wc.setZoomLevel(wc.getZoomLevel() + delta);
-}
-
-const KEY_NAMES = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', ' ': 'space', Tab: 'tab', '+': '=', _: '-', '{': '[', '}': ']' };
-
-function chordOf(input) {
-  let key = input.code === 'Space' ? 'space' : KEY_NAMES[input.key] || input.key.toLowerCase();
-  if (input.key === '?') return '?';
-  const mods = [];
-  if (input.control) mods.push('ctrl');
-  if (input.alt) mods.push('alt');
-  if (input.meta) mods.push('cmd');
-  if (input.shift) mods.push('shift');
-  return [...mods, key].join('+');
 }
 
 function setPrefix(armed) {

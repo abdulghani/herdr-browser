@@ -14,7 +14,7 @@ const looksLikeUrl = (text) =>
 function highlighted(text, positions) {
   const marks = new Set(positions);
   const out = [];
-  for (let i = 0; i < text.length; ) {
+  for (let i = 0; i < text.length;) {
     const bold = marks.has(i);
     let j = i;
     while (j < text.length && marks.has(j) === bold) j++;
@@ -43,12 +43,20 @@ function render({ rows, selected }) {
         const blank = () => el('span', { className: 'sg-icon favicon-blank' });
         icon = row.favicon ? el('img', { className: 'sg-icon', src: row.favicon, onerror: (e) => e.target.replaceWith(blank()) }) : blank();
         main = [
-          el('span', { className: 'sg-title' }, highlighted(row.title || row.displayUrl, row.title ? row.highlight.title : row.highlight.url)),
+          el(
+            'span',
+            { className: 'sg-title' },
+            highlighted(row.title || row.displayUrl, row.title ? row.highlight.title : row.highlight.url),
+          ),
           ...(row.title ? [el('span', { className: 'sg-url' }, highlighted(row.displayUrl, row.highlight.url))] : []),
         ];
         detail = row.kind === 'tab' ? 'switch to tab' : '';
       }
-      const item = el('li', { className: `sg${i === selected ? ' selected' : ''}` }, [icon, ...main, el('span', { className: 'sg-detail', textContent: detail })]);
+      const item = el('li', { className: `sg${i === selected ? ' selected' : ''}` }, [
+        icon,
+        ...main,
+        el('span', { className: 'sg-detail', textContent: detail }),
+      ]);
       // Only move the highlight on hover (rebuilding the list would swap the row out from under the
       // mouse), and only when the mouse really moved: a list opening under a resting pointer
       // shouldn't change what Enter picks.

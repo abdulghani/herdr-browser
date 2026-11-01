@@ -38,7 +38,13 @@ contextBridge.executeInMainWorld({
     if (PublicKeyCredential.getClientCapabilities) {
       Object.defineProperty(PublicKeyCredential, 'getClientCapabilities', {
         value: function getClientCapabilities() {
-          return Promise.resolve({ conditionalGet: false, conditionalCreate: false, hybridTransport: false, passkeyPlatformAuthenticator: false, userVerifyingPlatformAuthenticator: false });
+          return Promise.resolve({
+            conditionalGet: false,
+            conditionalCreate: false,
+            hybridTransport: false,
+            passkeyPlatformAuthenticator: false,
+            userVerifyingPlatformAuthenticator: false,
+          });
         },
         configurable: true,
         writable: true,
@@ -50,8 +56,11 @@ contextBridge.executeInMainWorld({
 // Tell the main process when a text field has focus, so Option+arrow moves the cursor
 // by word there instead of switching tabs.
 const isTextField = (el) =>
-  !!el && (el.isContentEditable || el.tagName === 'TEXTAREA' ||
-    (el.tagName === 'INPUT' && !['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(el.type)));
+  !!el &&
+  (el.isContentEditable ||
+    el.tagName === 'TEXTAREA' ||
+    (el.tagName === 'INPUT' &&
+      !['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(el.type)));
 const reportTextFocus = (e) => ipcRenderer.send('text-focus', e.type === 'focusin' && isTextField(e.composedPath()[0]));
 window.addEventListener('focusin', reportTextFocus, true);
 window.addEventListener('focusout', reportTextFocus, true);

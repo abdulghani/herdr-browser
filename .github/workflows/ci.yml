@@ -1,0 +1,80 @@
+# Lint, format check, unused code check (knip) and unit tests on every pull request and push to main.
+# One job installs the dependencies and caches node_modules under a hash of package-lock.json;
+# each check then runs in its own job from that cache.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  install:
+    name: Install dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          # Same OS, Node version and lockfile -> same node_modules.
+          key: node-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+        env:
+          # The checks don't need Electron itself.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+  check:
+    name: ${{ matrix.name }}
+    needs: install
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint
+            run: npm run lint
+          - name: Formatting
+            run: npm run format:check
+          - name: Knip
+            run: npm run knip
+          - name: Unit tests
+            run: npm test
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          # Same OS, Node version and lockfile -> same node_modules.
+          key: node-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+          fail-on-cache-miss: true
+
+      - name: ${{ matrix.name }}
+        run: ${{ matrix.run }}
