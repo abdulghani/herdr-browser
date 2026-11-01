@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+## v0.3.5 (2026-11-01)
+
 - Downloads: files save straight to your Downloads folder, and a download button next to the address bar shows their progress and lists recent downloads, where you can open, pause, resume, cancel or retry them (`Cmd+Option+L` on macOS, `Ctrl+J` elsewhere)
+
+* Check that releases show the new version in settings' About tab by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/22
+* Add a downloads button and panel next to the address bar by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/23
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.4...v0.3.5
 
 ## v0.3.4 (2026-11-01)
 
