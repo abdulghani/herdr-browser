@@ -50,8 +50,9 @@ jobs:
             run: npm run lint
           - name: Formatting
             run: npm run format:check
+          # Knip loads vite.config.mjs, which needs the Electrobun devkit (see Build UI).
           - name: Knip
-            run: npm run knip
+            run: npx electrobun prepare && npm run knip
           # Fails if coverage of src/ drops below 80% (vitest.config.mjs).
           - name: Unit tests
             run: npm run test:coverage
