@@ -74,3 +74,6 @@ Mirrors the herdr config: `Ctrl+Space` is the prefix.
 | Move tab / workspace | `Alt+Shift+arrows` | |
 | Collapse sidebar | prefix `b` | `Ctrl+B` |
 | Address bar / back / forward | | `Ctrl+L` / `Ctrl+[` / `Ctrl+]` |
+
+While typing in a text box, `Alt+arrows` (Option on a Mac) move the cursor by word or line as usual,
+and `Alt+Shift+arrows` select text, instead of switching or moving tabs.
