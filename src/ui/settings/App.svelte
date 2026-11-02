@@ -1,9 +1,10 @@
-<script>
-  // The herdr://settings page. window.herdrSettings comes from page-preload.js, which only exposes
+<script lang="ts">
+  // The herdr://settings page. window.herdrSettings comes from page-preload.ts, which only exposes
   // it on this page.
   import AboutTab from './AboutTab.svelte';
   import DnsTab from './DnsTab.svelte';
   import ShortcutsTab from './ShortcutsTab.svelte';
+  import type { SettingsData } from '../../types';
 
   const api = window.herdrSettings;
 
@@ -13,25 +14,33 @@
     { id: 'about', label: 'About' },
   ];
 
-  let data = $state.raw({ settings: null, providers: [], about: null });
-  let buttons = $state([]);
+  let data = $state.raw<{
+    settings: SettingsData['settings'] | null;
+    providers: SettingsData['providers'];
+    about: SettingsData['about'] | null;
+  }>({
+    settings: null,
+    providers: [],
+    about: null,
+  });
+  let buttons = $state<HTMLButtonElement[]>([]);
 
   // The open tab is kept in the URL (herdr://settings/#shortcuts), so a reload stays on it.
-  const tabOf = (name) => TABS.find((t) => t.id === name) || TABS[0];
+  const tabOf = (name: string) => TABS.find((t) => t.id === name) || TABS[0];
   const first = tabOf(location.hash.slice(1)).id;
   let current = $state(first);
   history.replaceState(null, '', `#${first}`);
 
-  function showTab(name) {
+  function showTab(name: string) {
     current = tabOf(name).id;
     history.replaceState(null, '', `#${current}`);
   }
 
   // Up/down arrows move between tabs, like a native tab list.
-  function onkeydown(e) {
+  function onkeydown(e: KeyboardEvent) {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     e.preventDefault();
-    const i = buttons.indexOf(document.activeElement) + (e.key === 'ArrowDown' ? 1 : -1);
+    const i = buttons.indexOf(document.activeElement as HTMLButtonElement) + (e.key === 'ArrowDown' ? 1 : -1);
     const next = (i + TABS.length) % TABS.length;
     showTab(TABS[next].id);
     buttons[next].focus();

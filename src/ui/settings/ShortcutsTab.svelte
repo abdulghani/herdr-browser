@@ -1,7 +1,7 @@
-<script>
-  import { shortcutsFor } from './shortcuts.js';
+<script lang="ts">
+  import { shortcutsFor } from './shortcuts';
 
-  let { platform } = $props();
+  let { platform }: { platform: string | undefined } = $props();
 </script>
 
 <h2 class="mb-1.5 text-[15px] font-bold">Shortcuts</h2>

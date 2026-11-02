@@ -1,10 +1,30 @@
-<script>
+<script lang="ts">
   // One workspace in the sidebar: number, name and tab count, or its initials in the collapsed rail.
-  import { draggable, dragState } from './drag.svelte.js';
-  import { initials, workspaceTitle } from './labels.js';
+  import { draggable, dragState } from './drag.svelte';
+  import { initials, workspaceTitle } from './labels';
   import RenameInput from './RenameInput.svelte';
+  import type { HerdrApi } from './preload';
+  import type { Workspace } from '../../types';
 
-  let { ws, index, active, collapsed, cmd, renaming, onrename, onfinishrename } = $props();
+  let {
+    ws,
+    index,
+    active,
+    collapsed,
+    cmd,
+    renaming,
+    onrename,
+    onfinishrename,
+  }: {
+    ws: Workspace;
+    index: number;
+    active: boolean;
+    collapsed: boolean;
+    cmd: HerdrApi['cmd'];
+    renaming: boolean;
+    onrename: (kind: 'workspace', id: string) => void;
+    onfinishrename: (commit: boolean, name: string) => void;
+  } = $props();
 
   // Tabs dropped on a workspace move into it; workspaces dropped on one reorder.
   const dnd = $derived(

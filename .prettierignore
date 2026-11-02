@@ -1,6 +1,7 @@
 coverage/
 dist/
 dist-ui/
+dist-main/
 node_modules/
 package-lock.json
 # Written by the release workflow.

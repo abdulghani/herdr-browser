@@ -1,5 +1,7 @@
-<script>
-  let { about } = $props();
+<script lang="ts">
+  import type { SettingsData } from '../../types';
+
+  let { about }: { about: SettingsData['about'] | null } = $props();
 
   const rows = $derived(
     about

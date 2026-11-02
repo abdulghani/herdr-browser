@@ -1,22 +1,23 @@
-<script>
+<script lang="ts">
   // The address bar, and the suggestions under it. The list is drawn by an overlay view on top of
   // the page (src/ui/suggestions); this side owns the rows and the selection, and tells main where
   // to put the overlay.
   import { onDestroy, untrack } from 'svelte';
+  import type { SuggestionRow, Tab } from '../../types';
 
-  let { tab } = $props();
+  let { tab }: { tab: Tab | undefined } = $props();
   const herdr = window.herdr;
   const cmd = herdr.cmd;
 
-  let input;
+  let input: HTMLInputElement;
   let value = $state('');
-  let lastTabId = null;
+  let lastTabId: string | null = null;
 
-  let rows = []; // [{ kind: 'typed' | 'tab' | 'history', ... }]
+  let rows: SuggestionRow[] = []; // [{ kind: 'typed' | 'tab' | 'history', ... }]
   let selected = 0;
   let seq = 0;
   let open = false;
-  let timers = []; // pending blur checks
+  let timers: ReturnType<typeof setTimeout>[] = []; // pending blur checks
   onDestroy(() => timers.forEach(clearTimeout));
 
   // Wait a moment before closing on blur, since a press on the overlay also moves focus out of here
@@ -42,13 +43,15 @@
     lastTabId = tab.id;
   }
   $effect(() => {
+    // Reading tab is what makes this run again when it changes.
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     tab;
     untrack(sync);
   });
 
   // On focus, a blank tab lists recent pages; other tabs wait for typing (so clicking in to copy
   // the address doesn't pop a list over the page).
-  async function update({ onFocus = false } = {}) {
+  async function update({ onFocus = false } = {}): Promise<void> {
     if (!hasFocus()) return hide();
     if (onFocus && tab?.url !== 'about:blank') return;
     const query = input.value.trim();
@@ -74,15 +77,15 @@
     open = false;
   }
 
-  function pick(row) {
+  function pick(row: SuggestionRow | undefined) {
     if (!row) return;
-    if (row.kind === 'tab') cmd('switchToTab', row.tabId);
+    if (row.kind === 'tab') cmd('switchToTab', row.tabId!);
     else cmd('navigate', row.kind === 'typed' ? row.query : row.url);
     hide();
     input.blur();
   }
 
-  function onkeydown(e) {
+  function onkeydown(e: KeyboardEvent) {
     if (open && e.key === 'Enter') {
       e.preventDefault();
       pick(rows[selected]);
@@ -97,7 +100,7 @@
     }
   }
 
-  function onsubmit(e) {
+  function onsubmit(e: SubmitEvent) {
     e.preventDefault();
     cmd('navigate', input.value);
     input.blur();

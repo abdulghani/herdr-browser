@@ -1,8 +1,26 @@
-<script>
+<script lang="ts">
   // The workspaces down the left. Collapsed, it is a rail of initials.
   import WorkspaceItem from './WorkspaceItem.svelte';
+  import type { HerdrApi } from './preload';
+  import type { UiState } from '../../types';
 
-  let { appState, cmd, mac, renaming, onrename, onfinishrename, helpOpen = $bindable() } = $props();
+  let {
+    appState,
+    cmd,
+    mac,
+    renaming,
+    onrename,
+    onfinishrename,
+    helpOpen = $bindable(),
+  }: {
+    appState: UiState | null;
+    cmd: HerdrApi['cmd'];
+    mac: boolean;
+    renaming: { kind: 'tab' | 'workspace'; id: string } | null;
+    onrename: (kind: 'tab' | 'workspace', id: string) => void;
+    onfinishrename: (commit: boolean, name: string) => void;
+    helpOpen: boolean;
+  } = $props();
 
   const collapsed = $derived(!!appState?.sidebarCollapsed);
   const headerPadding = $derived.by(() => {
@@ -44,7 +62,7 @@
       <WorkspaceItem
         {ws}
         index={i}
-        active={i === appState.activeWs}
+        active={i === appState!.activeWs}
         {collapsed}
         renaming={renaming?.kind === 'workspace' && renaming.id === ws.id}
         {cmd}

@@ -1,0 +1,19 @@
+{
+  // Type checking only (npm run typecheck): Vite builds the pages (vite.config.ts) and the main
+  // process with its preloads (vite.main.config.ts), and vitest runs the tests from the source.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node", "vite/client"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "*.config.ts"]
+}

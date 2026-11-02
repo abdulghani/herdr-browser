@@ -1,13 +1,35 @@
-<script>
+<script lang="ts">
   // One tab: number, favicon (in a dashed ring while asleep), title and close button.
-  import { draggable, dragState } from './drag.svelte.js';
-  import { tabLabel } from './labels.js';
+  import { draggable, dragState } from './drag.svelte';
+  import { tabLabel } from './labels';
   import RenameInput from './RenameInput.svelte';
+  import type { HerdrApi } from './preload';
+  import type { Tab } from '../../types';
 
-  let { tab, index, wsId, active, asleep, cmd, renaming, onrename, onfinishrename } = $props();
+  let {
+    tab,
+    index,
+    wsId,
+    active,
+    asleep,
+    cmd,
+    renaming,
+    onrename,
+    onfinishrename,
+  }: {
+    tab: Tab;
+    index: number;
+    wsId: string;
+    active: boolean;
+    asleep: boolean;
+    cmd: HerdrApi['cmd'];
+    renaming: boolean;
+    onrename: (kind: 'tab', id: string) => void;
+    onfinishrename: (commit: boolean, name: string) => void;
+  } = $props();
 
   // A favicon that failed to load shows as a blank square instead.
-  let brokenFavicon = $state(null);
+  let brokenFavicon = $state<string | null>(null);
   const showFavicon = $derived(tab.favicon && tab.favicon !== brokenFavicon);
 
   const dnd = $derived(

@@ -1,14 +1,15 @@
-<script>
+<script lang="ts">
   // Find in page, under the toolbar (and the notice bar) while it is open for the tab.
   import { untrack } from 'svelte';
+  import type { FindState } from '../../types';
 
-  let { find, tabId } = $props();
+  let { find, tabId }: { find: FindState | null | undefined; tabId: string | undefined } = $props();
   const herdr = window.herdr;
   const cmd = herdr.cmd;
 
-  let input;
+  let input: HTMLInputElement;
   let text = $state('');
-  let findTabId = null;
+  let findTabId: string | undefined | null = null;
 
   // Don't clobber what the user is typing, unless they switched tabs.
   $effect(() => {
