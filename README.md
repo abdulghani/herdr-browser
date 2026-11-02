@@ -50,14 +50,16 @@ Needs Node.js 26, the current LTS (`.nvmrc`; with nvm, run `nvm use`). CI uses t
 
 ```sh
 npm install
-npm start               # build the UI (into dist-ui/) and run from source
+npm start               # build the app (into dist-ui/ and dist-main/) and run it
+npm run build           # only build: the UI pages and the main process (Vite)
 npm run build:ui        # only build the UI pages (Vite: Svelte + Tailwind)
 npm test                # unit tests (vitest)
+npm run typecheck       # TypeScript and Svelte type check (tsc, svelte-check)
 npm run test:coverage   # unit tests with coverage; fails below 80%
 npm run lint            # eslint
 npm run format          # prettier (npm run format:check only checks)
 npm run knip            # unused files, exports and dependencies
-npm run dist            # build the UI, then dist/HerdrBrowser-<version>-x86_64.AppImage
+npm run dist            # build the app, then dist/HerdrBrowser-<version>-x86_64.AppImage
 scripts/install-linux.sh   # install the newest build from dist/
 ```
 
@@ -69,10 +71,11 @@ everyday instance while developing.
 
 ## Project layout
 
-Tests sit next to the file they test, as `<name>.test.js`.
+The code is TypeScript (and Svelte components with `lang="ts"`). Tests sit next to the file they
+test, as `<name>.test.ts`.
 
-- `src/main.js`: starts the app, opens the window and connects the services
-- `src/ipc.js`: the commands the browser UI sends to the main process
+- `src/main.ts`: starts the app, opens the window and connects the services
+- `src/ipc.ts`: the commands the browser UI sends to the main process
 - `src/services/`: what the browser does, one folder each:
   - `workspaces/`: workspaces and tabs, saving the session, reopening closed tabs
   - `tab-views/`: the page shown in each tab, its size and place, sleeping tabs
@@ -83,13 +86,16 @@ Tests sit next to the file they test, as `<name>.test.js`.
   - `passkeys/`: the passkey notice and opening a page in another browser
   - `context-menu/`: the right-click menu
   - `downloads/`: saving downloads, the list of recent ones, and the downloads panel
+- `src/types.ts`: the shapes shared across the app (workspaces, tabs, what the pages are sent)
 - `src/lib/`: small shared functions (URLs, key names, fuzzy matching, file names, sizes and times,
   where the built pages are)
 - `src/ui/`: the pages, written as Svelte 5 components styled with Tailwind CSS 4: `browser/`
   (sidebar, tabs, address bar), `suggestions/` (the suggestion list), `downloads/` (the downloads
   panel), `settings/` (the settings page), `lib/` (the shared theme), the preloads that connect each
-  page to the main process, and `page-preload.js` (runs in every web page)
+  page to the main process, and `page-preload.ts` (runs in every web page)
 - `dist-ui/`: the pages built by Vite (`npm run build:ui`, not in git); the app loads them from here
+- `dist-main/`: the main process and the preloads built by Vite (`npm run build:main`, not in git),
+  as CommonJS `.cjs` files; this is what Electron runs
 - `src/testing/`: helpers for the tests (not part of the app)
 
 ## Releases

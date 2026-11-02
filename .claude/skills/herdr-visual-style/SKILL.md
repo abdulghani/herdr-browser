@@ -57,7 +57,7 @@ doesn't flash. Change them together.
 ## Layout sizes the main process depends on
 
 The main process places each tab's page view below the UI by these numbers. If you change one,
-change the constant in `src/services/tab-views/tab-views.js` too.
+change the constant in `src/services/tab-views/tab-views.ts` too.
 
 | Theme spacing       | Size  | Constant                  |
 | ------------------- | ----- | ------------------------- |
