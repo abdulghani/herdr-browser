@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+## v0.3.10 (2026-11-02)
+
 - Sign-in popups (like "Sign in with Google") open in their own small window, like in Chrome, so signing in works
 - Fixed a crash when a page closed itself
+
+* Open sign-in popups in their own window; fix a crash when a page closes itself by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/31
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.9...v0.3.10
 
 ## v0.3.9 (2026-11-02)
 
