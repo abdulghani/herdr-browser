@@ -18,7 +18,7 @@ on:
     # Tests and test helpers live in src/ too, but don't ship, so they don't make a release.
     paths:
       - 'src/**'
-      - '!src/**/*.test.js'
+      - '!src/**/*.test.ts'
       - '!src/testing/**'
       - 'CHANGELOG.md'
   workflow_dispatch:
@@ -54,7 +54,7 @@ jobs:
         id: diff
         run: |
           previous="$(git describe --tags --abbrev=0 --match 'v*')"
-          files=(src CHANGELOG.md ':(exclude,glob)src/**/*.test.js' ':(exclude)src/testing')
+          files=(src CHANGELOG.md ':(exclude,glob)src/**/*.test.ts' ':(exclude)src/testing')
           if git diff --quiet "$previous" HEAD -- "${files[@]}"; then
             echo "::notice::Nothing in src/ or CHANGELOG.md changed since $previous, so there's nothing to release."
             echo "release=false" >> "$GITHUB_OUTPUT"
@@ -168,8 +168,9 @@ jobs:
 
       - run: npm ci
 
-      # The pages (src/ui) are built into dist-ui/, which the app loads.
-      - run: npm run build:ui
+      # The pages (src/ui) are built into dist-ui/ and the main process with its preloads into
+      # dist-main/; the app ships those two folders.
+      - run: npm run build
 
       - run: npx electron-builder ${{ matrix.args }} --publish never
 
