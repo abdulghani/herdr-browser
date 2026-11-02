@@ -40,6 +40,37 @@ describe('downloads', () => {
     expect(m.download({ filename: '' }).getSavePath()).toBe(path.join(downloadsDir(), 'download'));
   });
 
+  it('asks where to save an image from "Save Image As…", and lists it once a place is picked', () => {
+    const src = 'https://img.example/cat.png';
+    const saveImage = () => {
+      wc().emit('context-menu', {}, { x: 1, y: 1, mediaType: 'image', srcURL: src });
+      m.menus
+        .at(-1)
+        .template.find((i) => i.label === 'Save Image As…')
+        .click();
+      expect(wc().downloadURL).toHaveBeenLastCalledWith(src);
+      return m.download({ filename: 'cat.png', url: src });
+    };
+    const saved = () => JSON.parse(fs.readFileSync(savedFile(), 'utf8'));
+
+    // Cancelling the dialog: nothing is listed.
+    const cancelled = saveImage();
+    expect(cancelled.setSavePath).not.toHaveBeenCalled();
+    expect(cancelled.setSaveDialogOptions).toHaveBeenCalledWith({ defaultPath: path.join(downloadsDir(), 'cat.png') });
+    cancelled.finish('cancelled');
+    expect(fs.existsSync(savedFile())).toBe(false);
+
+    // Picking a place: the file is followed there.
+    const picked = saveImage();
+    picked.savePath = path.join(dir, 'kitty.png');
+    picked.progress(500);
+    picked.finish();
+    expect(saved().map((e) => [e.filename, e.savePath, e.state])).toEqual([['kitty.png', path.join(dir, 'kitty.png'), 'completed']]);
+
+    // Only the address that was asked for asks; the next download of it saves straight away.
+    expect(m.download({ filename: 'cat.png', url: src }).setSavePath).toHaveBeenCalled();
+  });
+
   it('shows the button with the progress of running downloads', () => {
     expect(state().downloads).toEqual({ any: false, active: 0, progress: null, open: false });
     const a = m.download({ totalBytes: 1000 });

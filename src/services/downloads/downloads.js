@@ -45,6 +45,7 @@ function createDownloads(ctx) {
   let autoCloseTimer = null;
   const file = () => path.join(app.getPath('userData'), 'downloads.json');
   const find = (id) => entries.find((e) => e.id === id);
+  const askWhere = new Set(); // addresses from "Save Image As…", whose downloads ask where to save
 
   // ---------- the list ----------
 
@@ -92,16 +93,41 @@ function createDownloads(ctx) {
 
   // ---------- following a download ----------
 
-  // Save to the Downloads folder under a name no other file (or running download) has.
+  // Save to the Downloads folder under a name no other file (or running download) has. A file
+  // from "Save Image As…" asks where to save first; it joins the list once a place is picked, so
+  // cancelling the dialog leaves nothing behind.
   function track(item) {
+    const savePath = freePath(item.getFilename() || 'download');
+    if (!askWhere.delete(item.getURL())) {
+      item.setSavePath(savePath);
+      follow(item, addEntry(item, savePath));
+      return;
+    }
+    item.setSaveDialogOptions({ defaultPath: savePath });
+    let entry = null;
+    const begin = () => (entry ||= item.getSavePath() ? addEntry(item, item.getSavePath()) : null);
+    item.on('updated', (_e, state) => begin() && onUpdated(entry, item, state));
+    item.once('done', (_e, state) => begin() && onDone(entry, item, state));
+  }
+
+  function freePath(filename) {
     const dir = app.getPath('downloads');
     try {
       fs.mkdirSync(dir, { recursive: true });
     } catch {}
     const taken = (name) =>
       fs.existsSync(path.join(dir, name)) || entries.some((e) => items.has(e.id) && e.savePath === path.join(dir, name));
-    const savePath = path.join(dir, uniqueName(item.getFilename() || 'download', taken));
-    item.setSavePath(savePath);
+    return path.join(dir, uniqueName(filename, taken));
+  }
+
+  // Keep the list up to date as the file comes in.
+  function follow(item, entry) {
+    item.on('updated', (_e, state) => onUpdated(entry, item, state));
+    item.once('done', (_e, state) => onDone(entry, item, state));
+  }
+
+  // Add a download to the top of the list.
+  function addEntry(item, savePath) {
     const entry = {
       id: nextId++,
       filename: path.basename(savePath),
@@ -119,14 +145,13 @@ function createDownloads(ctx) {
     items.set(entry.id, item);
     lastSent.set(entry.id, { at: Date.now(), bytes: entry.receivedBytes });
     trim();
-    item.on('updated', (_e, state) => onUpdated(entry, item, state));
-    item.once('done', (_e, state) => onDone(entry, item, state));
     changed(true);
     // Like Chrome's download bubble, show the panel for a moment when a download starts.
     if (!open) {
       ctx.win.webContents.send('show-downloads');
       autoCloseTimer = setTimeout(hide, AUTO_CLOSE);
     }
+    return entry;
   }
 
   function read(entry, item, state) {
@@ -317,8 +342,15 @@ function createDownloads(ctx) {
   // Pointing at the panel keeps it open.
   ipcMain.on('downloads-pointer', () => clearTimeout(autoCloseTimer));
 
+  // "Save Image As…": download the address, asking where to save it.
+  function saveAs(wc, url) {
+    askWhere.add(url);
+    wc.downloadURL(url);
+  }
+
   return {
     start,
+    saveAs,
     saveNow,
     summary,
     show,

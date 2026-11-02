@@ -22,6 +22,27 @@ describe('context menu', () => {
     expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', 'https://link.example/']);
   });
 
+  it('offers image actions', () => {
+    const page = wc();
+    const src = 'https://img.example/cat.png';
+    const template = openMenu({ mediaType: 'image', srcURL: src });
+    expect(template.slice(0, 4).map((i) => i.label)).toEqual([
+      'Open Image in New Tab',
+      'Save Image As…',
+      'Copy Image',
+      'Copy Image Address',
+    ]);
+    item(template, 'Save Image As…').click();
+    expect(page.downloadURL).toHaveBeenCalledWith(src);
+    item(template, 'Copy Image').click();
+    expect(page.copyImageAt).toHaveBeenCalledWith(10, 20);
+    item(template, 'Copy Image Address').click();
+    expect(m.electron.clipboard.writeText).toHaveBeenCalledWith(src);
+    item(template, 'Open Image in New Tab').click();
+    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank', src]);
+    expect(item(openMenu({ mediaType: 'video', srcURL: 'https://v.example/a.mp4' }), 'Save Image As…')).toBeUndefined();
+  });
+
   it('offers editing for fields and copy for selected text', () => {
     expect(
       openMenu({ isEditable: true })

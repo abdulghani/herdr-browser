@@ -66,6 +66,8 @@ class FakeWebContents extends Emitter {
     this.stopFindInPage = vi.fn();
     this.toggleDevTools = vi.fn();
     this.inspectElement = vi.fn();
+    this.copyImageAt = vi.fn();
+    this.downloadURL = vi.fn();
     this.setZoomLevel = vi.fn((level) => (this.zoom = level));
     this.getZoomLevel = () => this.zoom;
     this.getURL = () => this.url;
@@ -106,6 +108,7 @@ class FakeDownloadItem extends Emitter {
     this.isPaused = () => this.paused;
     this.canResume = () => this.resumable;
     this.setSavePath = vi.fn((savePath) => (this.savePath = savePath));
+    this.setSaveDialogOptions = vi.fn();
     this.pause = vi.fn(() => (this.paused = true));
     this.resume = vi.fn(() => {
       this.paused = false;
