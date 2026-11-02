@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.3.9 (2026-11-02)
+
+* Move the source to TypeScript by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/30
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.8...v0.3.9
+
 ## v0.3.8 (2026-11-02)
 
 - Right-click an image to open it in a new tab, save it (asks where), copy it or copy its address, like in Chrome
