@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Sign-in popups (like "Sign in with Google") open in their own small window, like in Chrome, so signing in works
+- Fixed a crash when a page closed itself
+
 ## v0.3.9 (2026-11-02)
 
 * Move the source to TypeScript by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/30
