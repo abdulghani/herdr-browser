@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The address bar shows the new address after you click a link in the page, even if you had clicked in the address bar before
+
 ## v0.3.6 (2026-11-01)
 
 * Add a visual style skill for the UI by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/25
