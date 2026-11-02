@@ -33,10 +33,11 @@
   // element, but the document itself loses focus.
   const hasFocus = () => document.hasFocus() && document.activeElement === input;
 
-  // Show the tab's address, without clobbering what is typed unless the tab changed.
+  // Show the tab's address, without clobbering what is typed unless the tab changed. Once the page
+  // has focus (e.g. a link in it was clicked), the address follows it again.
   function sync() {
     if (!tab) return;
-    if (document.activeElement !== input || tab.id !== lastTabId) value = tab.url === 'about:blank' ? '' : tab.url;
+    if (!hasFocus() || tab.id !== lastTabId) value = tab.url === 'about:blank' ? '' : tab.url;
     if (tab.id !== lastTabId) hide();
     lastTabId = tab.id;
   }

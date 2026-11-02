@@ -94,6 +94,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -203,6 +204,17 @@ describe('rendering state', () => {
     expect($('address').value).toBe('typing');
     emit('state', onTab(1));
     expect($('address').value).toBe('');
+  });
+
+  it('follows a link clicked in the page, even though the address bar is still the focused element', () => {
+    $('address').focus();
+    typeInto($('address'), 'typing');
+    // Clicking the page moves focus to the page's view, out of this document.
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    const s = makeState();
+    s.workspaces[0].tabs[0].url = 'https://example.com/next';
+    emit('state', s);
+    expect($('address').value).toBe('https://example.com/next');
   });
 });
 
