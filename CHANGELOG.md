@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+## v0.3.7 (2026-11-02)
+
 - The address bar shows the new address after you click a link in the page, even if you had clicked in the address bar before
+
+* Use Node.js 26 LTS locally and in CI by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/26
+* Make the address bar follow links clicked in the page by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/28
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.6...v0.3.7
 
 ## v0.3.6 (2026-11-01)
 
