@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Right-click an image to open it in a new tab, save it (asks where), copy it or copy its address, like in Chrome
+
 ## v0.3.7 (2026-11-02)
 
 - The address bar shows the new address after you click a link in the page, even if you had clicked in the address bar before
