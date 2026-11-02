@@ -2,7 +2,14 @@
 
 ## Unreleased
 
+## v0.3.8 (2026-11-02)
+
 - Right-click an image to open it in a new tab, save it (asks where), copy it or copy its address, like in Chrome
+
+* Add image actions to the right-click menu, like Chrome by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/29
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.7...v0.3.8
 
 ## v0.3.7 (2026-11-02)
 
