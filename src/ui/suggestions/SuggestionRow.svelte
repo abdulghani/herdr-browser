@@ -1,11 +1,17 @@
-<script>
+<script lang="ts">
   // One suggestion: what was typed (open or search), or a page from history or an open tab.
   import Highlighted from './Highlighted.svelte';
-  import { looksLikeUrl } from './highlight.js';
+  import { looksLikeUrl } from './highlight';
+  import type { SuggestionRow } from '../../types';
 
-  let { row, selected, onmousemove, onmousedown } = $props();
+  let {
+    row,
+    selected,
+    onmousemove,
+    onmousedown,
+  }: { row: SuggestionRow; selected: boolean; onmousemove: (e: MouseEvent) => void; onmousedown: (e: MouseEvent) => void } = $props();
 
-  let brokenFavicon = $state(null);
+  let brokenFavicon = $state<string | null>(null);
   const url = $derived(row.kind === 'typed' && looksLikeUrl(row.query));
   const detail = $derived.by(() => {
     if (row.kind === 'typed') return url ? 'open' : 'search Google';

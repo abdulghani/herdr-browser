@@ -1,5 +1,5 @@
-# Lint, format check, unused code check (knip), unit tests with coverage and the UI build on every
-# pull request.
+# Lint, format check, unused code check (knip), type check, unit tests with coverage and the build
+# on every pull request.
 # One job installs the dependencies and caches node_modules under a hash of package-lock.json;
 # each check then runs in its own job from that cache.
 name: Checks
@@ -38,7 +38,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci
         env:
-          # The checks (and the Vite build of the UI) don't need Electron itself.
+          # The checks (and the Vite build) don't need Electron itself.
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
   check:
@@ -55,12 +55,15 @@ jobs:
             run: npm run format:check
           - name: Knip
             run: npm run knip
-          # Fails if coverage of src/ drops below 80% (vitest.config.mjs).
+          # TypeScript (tsc) and the Svelte components (svelte-check), tests included.
+          - name: Typecheck
+            run: npm run typecheck
+          # Fails if coverage of src/ drops below 80% (vitest.config.ts).
           - name: Unit tests
             run: npm run test:coverage
-          # The pages (src/ui, Svelte + Tailwind) build with Vite.
-          - name: Build UI
-            run: npm run build:ui
+          # The pages (src/ui, Svelte + Tailwind) and the main process with its preloads build with Vite.
+          - name: Build
+            run: npm run build
     steps:
       - uses: actions/checkout@v7
 

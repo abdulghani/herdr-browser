@@ -1,16 +1,25 @@
-<script>
+<script lang="ts">
   // Which DNS server to use, and a lookup to test it.
-  let { api, settings, providers } = $props();
+  import type { SettingsApi } from '../page-preload';
+  import type { ResolveResult, SettingsData } from '../../types';
+
+  let { api, settings, providers }: { api: SettingsApi; settings: SettingsData['settings'] | null; providers: SettingsData['providers'] } =
+    $props();
 
   const field = 'h-[30px] min-w-0 rounded-md border border-border bg-bg px-2.5 text-fg outline-none focus:border-accent';
 
-  let provider = $state();
+  let provider = $state<string | undefined>();
   let customUrl = $state('');
   let saving = $state(false);
-  let status = $state({ text: '', kind: '' });
+  let status = $state<{ text: string; kind: '' | 'ok' | 'error' }>({ text: '', kind: '' });
   let host = $state('example.com');
-  let lookup = $state(null); // null, 'busy', { host, error } or { addresses }
-  const STATUS_COLORS = { ok: 'text-ok', error: 'text-error' };
+  let lookup = $state<
+    | null
+    | 'busy'
+    | { host: string; error: string; addresses?: undefined }
+    | { addresses: NonNullable<ResolveResult['addresses']>; error?: undefined }
+  >(null); // null, 'busy', { host, error } or { addresses }
+  const STATUS_COLORS: Record<string, string> = { ok: 'text-ok', error: 'text-error' };
 
   // The saved choice, once it has loaded.
   $effect(() => {
@@ -19,26 +28,26 @@
     customUrl = settings.dns.customUrl;
   });
 
-  async function save(e) {
+  async function save(e: SubmitEvent) {
     e.preventDefault();
     saving = true;
     try {
-      await api.setDns({ provider, customUrl });
+      await api.setDns({ provider: provider!, customUrl });
       status = { text: 'Saved. New lookups use this server.', kind: 'ok' };
     } catch (err) {
-      status = { text: err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), kind: 'error' };
+      status = { text: (err as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), kind: 'error' };
     } finally {
       saving = false;
     }
   }
 
-  async function resolve(e) {
+  async function resolve(e: SubmitEvent) {
     e.preventDefault();
     const name = host.trim();
     if (!name) return;
     lookup = 'busy';
     const { addresses, error } = await api.resolve(name);
-    lookup = error ? { host: name, error } : { addresses };
+    lookup = error ? { host: name, error } : { addresses: addresses! };
   }
 </script>
 

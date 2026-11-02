@@ -20,7 +20,7 @@
   --font-mono: 'JetBrainsMono Nerd Font', 'JetBrains Mono', ui-monospace, monospace;
   --default-font-family: var(--font-mono);
 
-  /* Sizes the main process lays the page views out by (src/services/tab-views/tab-views.js). */
+  /* Sizes the main process lays the page views out by (src/services/tab-views/tab-views.ts). */
   --spacing-sidebar: 220px; /* SIDEBAR_WIDTH */
   --spacing-sidebar-collapsed: 52px; /* SIDEBAR_COLLAPSED_WIDTH */
   --spacing-tabstrip: 36px; /* tabstrip + toolbar = CHROME_HEIGHT */

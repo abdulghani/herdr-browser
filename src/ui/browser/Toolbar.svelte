@@ -1,19 +1,20 @@
-<script>
+<script lang="ts">
   // Back, forward, reload, the address bar, the download button and settings.
   import AddressBar from './AddressBar.svelte';
   import DownloadButton from './DownloadButton.svelte';
+  import type { Anchor, DownloadsSummary, Tab, UiState } from '../../types';
 
-  let { appState, tab, downloads } = $props();
+  let { appState, tab, downloads }: { appState: UiState | null; tab: Tab | undefined; downloads: DownloadsSummary | null } = $props();
   const herdr = window.herdr;
   const cmd = herdr.cmd;
 
-  let downloadsButton = $state();
-  let settingsButton = $state();
+  let downloadsButton = $state<HTMLButtonElement | undefined>();
+  let settingsButton = $state<HTMLButtonElement | undefined>();
   const nav = $derived(appState?.nav);
 
   // Where the downloads panel goes: under the download button, or the settings button while there's none.
-  export function downloadsAnchor() {
-    const button = downloadsButton.hidden ? settingsButton : downloadsButton;
+  export function downloadsAnchor(): Anchor {
+    const button = downloadsButton!.hidden ? settingsButton! : downloadsButton!;
     const { left, bottom, width } = button.getBoundingClientRect();
     return { x: left, y: bottom, width };
   }

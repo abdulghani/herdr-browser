@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // The browser UI: workspaces in the sidebar, the active workspace's tabs, the toolbar and the
   // bars under it. The main process sends the whole state on every change ('state').
   import FindBar from './FindBar.svelte';
@@ -6,24 +6,27 @@
   import Sidebar from './Sidebar.svelte';
   import TabStrip from './TabStrip.svelte';
   import Toolbar from './Toolbar.svelte';
+  import type { DownloadsSummary, UiState } from '../../types';
+
+  type Renaming = { kind: 'tab' | 'workspace'; id: string };
 
   const herdr = window.herdr;
   const cmd = herdr.cmd;
   const mac = herdr.platform === 'darwin';
 
-  let latest = null; // the newest state from main
-  let shown = $state.raw(null); // the state on screen; held still while a rename is open
-  let downloads = $state.raw(null); // download progress also comes on its own
-  let renaming = $state(null); // { kind, id } while an inline rename input is open
+  let latest: UiState | null = null; // the newest state from main
+  let shown = $state.raw<UiState | null>(null); // the state on screen; held still while a rename is open
+  let downloads = $state.raw<DownloadsSummary | null>(null); // download progress also comes on its own
+  let renaming = $state<Renaming | null>(null); // { kind, id } while an inline rename input is open
   let helpOpen = $state(false);
-  let pendingRename = null; // workspace rename requested while the sidebar is collapsed
+  let pendingRename: Renaming | null = null; // workspace rename requested while the sidebar is collapsed
   let collapseAfterRename = false;
-  let toolbar;
+  let toolbar: ReturnType<typeof Toolbar>;
 
   const ws = $derived(shown?.workspaces[shown.activeWs]);
   const tab = $derived(ws?.tabs[ws.activeTab]);
 
-  function show(s) {
+  function show(s: UiState) {
     shown = s;
     downloads = s.downloads;
   }
@@ -31,7 +34,7 @@
   // ---------- inline rename ----------
 
   // The rename input doesn't fit in the icon rail, so expand for the rename and collapse again after.
-  function requestRename(kind, id) {
+  function requestRename(kind: Renaming['kind'], id: string) {
     if (kind === 'workspace' && latest?.sidebarCollapsed) {
       pendingRename = { kind, id };
       collapseAfterRename = true;
@@ -41,13 +44,13 @@
     startRename(kind, id);
   }
 
-  function startRename(kind, id) {
+  function startRename(kind: Renaming['kind'], id: string) {
     const found = kind === 'tab' ? ws?.tabs.some((t) => t.id === id) : shown?.workspaces.some((w) => w.id === id);
     if (found) renaming = { kind, id };
   }
 
-  function finishRename(commit, name) {
-    const { kind, id } = renaming;
+  function finishRename(commit: boolean, name: string) {
+    const { kind, id } = renaming!;
     renaming = null;
     if (commit) cmd(kind === 'tab' ? 'renameTab' : 'renameWorkspace', { id, name });
     if (collapseAfterRename) {

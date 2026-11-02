@@ -1,20 +1,30 @@
-<script>
+<script lang="ts">
   // One download: file type, name, status line, progress bar while it runs, and its buttons.
   import Icon from './Icon.svelte';
+  import type { DownloadAction, DownloadRow } from '../../types';
 
-  let { row, onaction } = $props();
+  type Button = Exclude<DownloadAction, 'open'>;
 
-  const LABELS = { show: 'Show in folder', pause: 'Pause', resume: 'Resume', cancel: 'Cancel', retry: 'Retry', remove: 'Remove from list' };
+  let { row, onaction }: { row: DownloadRow; onaction: (name: DownloadAction, id: number) => void } = $props();
+
+  const LABELS: Record<Button, string> = {
+    show: 'Show in folder',
+    pause: 'Pause',
+    resume: 'Resume',
+    cancel: 'Cancel',
+    retry: 'Retry',
+    remove: 'Remove from list',
+  };
 
   // Which buttons a row gets for where its download is.
-  function actionsFor(row) {
+  function actionsFor(row: DownloadRow): Button[] {
     if (row.state === 'progressing') return [row.paused ? 'resume' : 'pause', 'cancel'];
     if (row.state === 'completed' && !row.removed) return ['show', 'remove'];
     return ['retry', 'remove'];
   }
 
   // "report.pdf" -> "PDF", shown on the file icon.
-  const extension = (filename) => (/\.([a-z0-9]{1,4})$/i.exec(filename)?.[1] || '').toUpperCase();
+  const extension = (filename: string) => (/\.([a-z0-9]{1,4})$/i.exec(filename)?.[1] || '').toUpperCase();
 
   const kind = $derived(row.removed ? 'removed' : row.state);
   const openable = $derived(row.state === 'completed' && !row.removed);

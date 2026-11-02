@@ -1,7 +1,10 @@
-<script>
+<script lang="ts">
   // A bar under the toolbar about the tab. Only kind so far: a site asked for a passkey, which
   // Electron can't do.
-  let { notice, cmd } = $props();
+  import type { HerdrApi } from './preload';
+  import type { Notice } from '../../types';
+
+  let { notice, cmd }: { notice: Notice | undefined; cmd: HerdrApi['cmd'] } = $props();
 </script>
 
 <div id="notice" class="flex h-notice items-center gap-2.5 border-b border-border bg-notice pr-2 pl-3.5" hidden={!notice}>

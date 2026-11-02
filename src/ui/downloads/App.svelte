@@ -1,11 +1,12 @@
-<script>
+<script lang="ts">
   // Draws the downloads panel from the rows the main process sends (src/services/downloads), and
   // sends back what is clicked: open, show in folder, pause, resume, cancel, retry or remove.
   import DownloadRow from './DownloadRow.svelte';
+  import type { DownloadRow as Row } from '../../types';
 
   const api = window.downloads;
 
-  let rows = $state.raw([]);
+  let rows = $state.raw<Row[]>([]);
   const nothingToClear = $derived(!rows.some((row) => row.state !== 'progressing'));
 
   api.onRows((list) => (rows = list));

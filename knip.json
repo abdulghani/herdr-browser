@@ -1,5 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/ui/**/preload.js", "src/ui/page-preload.js"],
-  "project": ["src/**/*.{js,svelte,css}"]
+  "project": ["src/**/*.{ts,svelte,css}"]
 }

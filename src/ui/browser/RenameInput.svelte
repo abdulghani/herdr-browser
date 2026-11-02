@@ -1,11 +1,11 @@
-<script>
+<script lang="ts">
   // The inline rename box over a tab or workspace name. Enter or leaving it saves, Escape cancels.
-  let { value, onfinish } = $props();
+  let { value, onfinish }: { value: string; onfinish: (commit: boolean, name: string) => void } = $props();
 
-  let input;
+  let input: HTMLInputElement;
   let done = false;
 
-  const finish = (commit) => {
+  const finish = (commit: boolean) => {
     if (done) return;
     done = true;
     onfinish(commit, input.value);

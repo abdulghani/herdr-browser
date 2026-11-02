@@ -1,14 +1,21 @@
-<script>
+<script lang="ts">
   // The download button shows once there is something to list, like Chrome's, with a ring around
   // it filling up while files download (spinning when their size isn't known).
-  let { downloads, platform, onclick, button = $bindable() } = $props();
+  import type { DownloadsSummary } from '../../types';
 
-  const running = $derived(downloads?.active > 0);
-  const sized = $derived(running && downloads.progress !== null);
-  const filled = $derived(sized ? Math.round(downloads.progress * 100) : 25);
+  let {
+    downloads,
+    platform,
+    onclick,
+    button = $bindable(),
+  }: { downloads: DownloadsSummary | null; platform: string; onclick: () => void; button?: HTMLButtonElement } = $props();
+
+  const running = $derived((downloads?.active ?? 0) > 0);
+  const sized = $derived(running && downloads!.progress !== null);
+  const filled = $derived(sized ? Math.round(downloads!.progress! * 100) : 25);
   const keys = $derived(platform === 'darwin' ? 'Cmd+Option+L' : 'Ctrl+J');
   const title = $derived(
-    running ? `Downloading ${downloads.active} file${downloads.active > 1 ? 's' : ''} (${keys})` : `Downloads (${keys})`,
+    running ? `Downloading ${downloads!.active} file${downloads!.active > 1 ? 's' : ''} (${keys})` : `Downloads (${keys})`,
   );
 </script>
 
