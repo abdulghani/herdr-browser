@@ -55,6 +55,32 @@ describe('page events', () => {
     expect(ws().activeTab).toBe(1);
   });
 
+  it('opens a popup the page sized itself in its own window, so it can report back', () => {
+    const result = wc().windowOpenHandler!({ url: 'https://accounts.example/signin', disposition: 'new-window' });
+    expect(result.action).toBe('allow');
+    expect(ws().tabs).toHaveLength(1);
+  });
+
+  it('closes the tab when its page closes itself', () => {
+    m.cmd('newTab');
+    const page = wc();
+    page.emit('destroyed');
+    expect(ws().tabs.map((t) => t.url)).toEqual(['about:blank']);
+    expect(m.shownView()).toBe(view());
+    // Saving the session afterwards still works.
+    m.cmd('newTab');
+    expect(() => m.cmd('closeTab', ws().tabs[1].id)).not.toThrow();
+  });
+
+  it("doesn't close another tab when a page the app closed goes away", () => {
+    m.cmd('newTab');
+    const first = ws().tabs[0].id;
+    const page = wc();
+    m.cmd('closeTab', ws().tabs[1].id);
+    page.emit('destroyed');
+    expect(ws().tabs.map((t) => t.id)).toEqual([first]);
+  });
+
   it('ignores events from a tab that was closed', () => {
     const first = view().webContents;
     m.cmd('newTab');

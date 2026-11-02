@@ -10,6 +10,7 @@ import type { UiState } from '../types';
 // The listeners take whatever the event passes; the code under test registers them with
 // Electron's own types.
 type Listener = (...args: unknown[]) => unknown;
+type WindowOpenHandler = (details: { url: string; disposition?: string }) => { action: string; overrideBrowserWindowOptions?: object };
 
 class Emitter {
   listeners: Record<string, { fn: Listener; once?: boolean }[]> = {};
@@ -39,7 +40,7 @@ class FakeWebContents extends Emitter {
   entries: NavigationEntry[] = [];
   activeIndex = 0;
   mainFrame = { url: '' };
-  windowOpenHandler?: (details: { url: string }) => { action: string };
+  windowOpenHandler?: WindowOpenHandler;
   loadURL = vi.fn(async (url: string) => {
     this.url = url;
     this.mainFrame.url = url;
@@ -64,7 +65,7 @@ class FakeWebContents extends Emitter {
   isLoading = () => this.loading;
   isCurrentlyAudible = () => false;
   isCrashed = () => false;
-  setWindowOpenHandler = vi.fn((fn: (details: { url: string }) => { action: string }) => (this.windowOpenHandler = fn));
+  setWindowOpenHandler = vi.fn((fn: WindowOpenHandler) => (this.windowOpenHandler = fn));
   navigationHistory = {
     canGoBack: () => this.activeIndex > 0,
     canGoForward: () => this.activeIndex < this.entries.length - 1,

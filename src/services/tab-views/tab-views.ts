@@ -88,13 +88,23 @@ export function createTabViews(ctx: Ctx) {
       ctx.suggestions.close();
       ctx.downloads.close();
     });
-    wc.setWindowOpenHandler(({ url }) => {
-      // Popups and target=_blank open as a new tab in the same workspace.
+    wc.setWindowOpenHandler(({ url, disposition }) => {
+      // A popup the page sized itself (window.open with features, e.g. "Sign in with Google")
+      // opens in its own small window, like in Chrome, so it can still report back to the page
+      // that opened it and close itself when done.
+      if (disposition === 'new-window') return { action: 'allow', overrideBrowserWindowOptions: { backgroundColor: '#ffffff' } };
+      // Links with target=_blank and plain window.open() open as a new tab in the same workspace.
       const found = workspaces.findTab(tab.id);
       if (found) workspaces.openTab(url, found.ws, found.idx + 1);
       return { action: 'deny' };
     });
     wc.on('context-menu', (_e, params) => ctx.contextMenu.show(wc, params, tab.id));
+    // A page that closes itself (window.close()) closes its tab.
+    wc.once('destroyed', () => {
+      if (views.get(tab.id) !== view) return; // the app closed it
+      forget(tab.id, view);
+      workspaces.closeTab(tab.id);
+    });
   }
 
   function showActive() {
@@ -123,11 +133,16 @@ export function createTabViews(ctx: Ctx) {
   function destroy(tabId: string) {
     const view = views.get(tabId);
     if (!view) return;
+    forget(tabId, view);
+    view.webContents.close();
+  }
+
+  // Take a tab's view off the window and out of the list (before its page is closed).
+  function forget(tabId: string, view: WebContentsView) {
     if (shownTabId === tabId) {
       ctx.win.contentView.removeChildView(view);
       shownTabId = null;
     }
-    view.webContents.close();
     views.delete(tabId);
     ctx.sleeping.viewGone(tabId);
     ctx.find.drop(tabId);
