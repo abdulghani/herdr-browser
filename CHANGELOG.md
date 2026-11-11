@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Tabs widen again to fill the tab bar after you close some, up to their full width, like in Chrome
+
 ## v0.3.10 (2026-11-02)
 
 - Sign-in popups (like "Sign in with Google") open in their own small window, like in Chrome, so signing in works

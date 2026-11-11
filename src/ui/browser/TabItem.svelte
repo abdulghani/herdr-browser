@@ -48,7 +48,7 @@
 
 <li
   class={[
-    'tab app-no-drag group relative flex min-w-[90px] flex-[0_1_200px] cursor-pointer items-center gap-1.5 border-r border-border pr-1.5 pl-2.5',
+    'tab app-no-drag group relative flex w-[200px] min-w-[90px] shrink cursor-pointer items-center gap-1.5 border-r border-border pr-1.5 pl-2.5',
     active
       ? "active bg-bg text-fg after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:bg-accent after:content-['']"
       : 'text-muted hover:bg-panel-2 hover:text-fg',
