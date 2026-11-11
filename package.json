@@ -1,7 +1,7 @@
 {
   "name": "herdr-browser",
   "productName": "Herdr Browser",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "description": "Chromium browser with herdr-style layout: vertical workspaces, horizontal tabs inside each",
   "type": "module",
   "main": "dist-main/main.cjs",

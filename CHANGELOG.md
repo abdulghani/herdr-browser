@@ -2,7 +2,14 @@
 
 ## Unreleased
 
+## v0.3.11 (2026-11-11)
+
 - Tabs widen again to fill the tab bar after you close some, up to their full width, like in Chrome
+
+* Let tabs widen again after closing some by @abdulghani in https://github.com/abdulghani/herdr-browser/pull/32
+
+
+**Full Changelog**: https://github.com/abdulghani/herdr-browser/compare/v0.3.10...v0.3.11
 
 ## v0.3.10 (2026-11-02)
 
